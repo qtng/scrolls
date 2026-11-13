@@ -101,9 +101,6 @@
 .ruby-box .rt-input { flex: 1 1 auto; min-width: 0; }
 .ruby-box .rt-preview { font-family: var(--doc-font, var(--font-cjk)), var(--font-cjk), serif; font-size: 1.15rem; padding: 0 .3rem; min-height: 1.2em; }
 .ruby-box .rt-preview[hidden] { display: none; }
-.ruby-box .rt-sugg { display: flex; flex-wrap: wrap; gap: 3px; }
-.ruby-box .rt-sugg:empty { display: none; }
-.ruby-box .rt-chip { min-width: 0; height: 1.8rem; border: 1px solid var(--bs-border-color); border-radius: 50rem; padding: 0 .55rem; font-family: var(--doc-font, var(--font-cjk)), var(--font-cjk), serif; }
 
 /* the toolbar: under the title bar (it stays at the top when the page scrolls); on a phone fixed at the bottom (editor.js sets its top) */
 .toolbar { display: flex; align-items: center; gap: 2px; max-width: 52rem; margin: 0 auto; padding: .15rem 1rem .35rem; overflow-x: auto; scrollbar-width: none; font-size: .85rem; }

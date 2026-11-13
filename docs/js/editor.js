@@ -286,15 +286,6 @@ const Scripts = {
     fromPa(pa) { return this.parser && typeof PaText !== 'undefined' ? PaText.read(pa, this.parser) : ''; },
 };
 
-// the readings of a character or word in the dictionaries of ime.js, in Quốc Ngữ
-async function readingsOf(text) {
-    if (!window.VietIme || !text) return [];
-    try { await VietIme.load(); } catch (e) { return []; }
-    const seen = new Set();
-    for (const e of VietIme.lookupGlyph(text)) if (e.glyph === text && e.reading) seen.add(e.reading);
-    return [...seen];
-}
-
 // text with the annotation of the QATT fonts: a character, U+F00B0 (over) or U+F00B1 (under), a PA syllable, maybe U+F00B2 (end)
 const ANNOT = /(\P{M})([\u{F00B0}\u{F00B1}])([\u{F00D0}-\u{F010E}]+)\u{F00B2}?/gu;
 function annotToRuby(fragment) {
@@ -515,7 +506,6 @@ const RubyBox = {
         this.ok = btn(el('i', { className: 'fa-solid fa-check' }), 'Apply', 'Áp dụng', () => this.apply(this.input.value));
         this.del = btn(el('i', { className: 'fa-solid fa-trash' }), 'Remove the ruby', 'Bỏ chú âm', () => this.apply(''));
         this.shown = el('span', { className: 'rt-preview' });
-        this.sugg = el('div', { className: 'rt-sugg' });
         this.kindBtns = Scripts.KINDS.map(([k, label]) => {
             const b = btn(label, { qn: 'Quốc Ngữ', pa: 'PA', qatt: 'QATT' }[k], { qn: 'Quốc Ngữ', pa: 'PA', qatt: 'QATT' }[k], () => this.setKind(k));
             b.dataset.k = k;
@@ -523,12 +513,10 @@ const RubyBox = {
         });
         this.overBtn = btn(el('i', { className: 'bi' }), 'Over (vertical: right)', 'Trên (dọc: bên phải)', () => this.setSide('over'));
         this.underBtn = btn(el('i', { className: 'bi' }), 'Under (vertical: left)', 'Dưới (dọc: bên trái)', () => this.setSide('under'));
-        this.eachBtn = btn(el('i', { className: 'fa-solid fa-wand-magic-sparkles' }), 'Each character its reading from the dictionary', 'Từng chữ theo từ điển', () => this.eachChar());
         this.box = el('div', { className: 'scroll-ui ruby-box', hidden: true },
             el('div', { className: 'rt-row' }, this.input, this.ok, this.del),
             el('div', { className: 'rt-row' }, this.shown),
-            this.sugg,
-            el('div', { className: 'rt-row' }, ...this.kindBtns, el('span', { className: 'sep' }), this.overBtn, this.underBtn, el('span', { className: 'sep' }), this.eachBtn));
+            el('div', { className: 'rt-row' }, ...this.kindBtns, el('span', { className: 'sep' }), this.overBtn, this.underBtn));
         this.box.addEventListener('mousedown', e => { if (e.target !== this.input) e.preventDefault(); });
         document.body.append(this.box);
         document.addEventListener('pointerdown', e => { if (this.isOpen() && !this.box.contains(e.target)) this.close(false); });
@@ -550,25 +538,13 @@ const RubyBox = {
         this.input.value = mark ? (mark.attrs.qn || mark.attrs.rt) : '';
         this.base = state.doc.textBetween(range.from, range.to);
         this.del.hidden = !mark;
-        this.eachBtn.hidden = [...this.base].length < 2;
         this.markKind(); this.markSide();
         this.box.hidden = false;
         this.place();
         this.input.focus();
         this.input.select();
-        this.sugg.replaceChildren();
         if (this.kind !== 'qn') await Scripts.load();
         this.preview();
-        const list = await readingsOf(this.base);
-        if (this.range !== range) return;
-        this.suggestions = list;
-        this.sugg.replaceChildren(...list.slice(0, 12).map(r => {
-            const b = el('button', { type: 'button', className: 'rt-chip', textContent: Scripts.text(r, this.kind) });
-            b.title = r;
-            b.addEventListener('click', () => this.apply(r));
-            return b;
-        }));
-        if (!this.input.value && list.length) { this.input.value = list[0]; this.input.select(); this.preview(); }
         this.place();
     },
     // fixed at the toolbar: under it, on the phone above it
@@ -585,7 +561,6 @@ const RubyBox = {
     },
     markKind() {
         for (const b of this.kindBtns) b.classList.toggle('on', b.dataset.k === this.kind);
-        for (const b of this.sugg.querySelectorAll('.rt-chip')) b.textContent = Scripts.text(b.title, this.kind);
     },
     markSide() {
         const vert = this.view.state.doc.resolve(this.range ? this.range.from : 0).node(1)?.attrs.dir === 'v';
@@ -607,21 +582,6 @@ const RubyBox = {
         if (qn && this.kind !== 'qn') await Scripts.load();
         const { from, to } = this.range, type = schema.marks.ruby, tr = this.view.state.tr.removeMark(from, to, type);
         if (qn) tr.addMark(from, to, type.create({ rt: Scripts.text(qn, this.kind), qn, side: this.side }));
-        this.view.dispatch(tr);
-        this.close(true);
-    },
-    // each character of the selection gets its own ruby: its first reading in the dictionary
-    async eachChar() {
-        const { from } = this.range, chars = [...this.base];
-        if (this.kind !== 'qn') await Scripts.load();
-        const readings = await Promise.all(chars.map(c => readingsOf(c)));
-        const type = schema.marks.ruby, tr = this.view.state.tr.removeMark(this.range.from, this.range.to, type);
-        let pos = from;
-        chars.forEach((c, i) => {
-            const qn = readings[i][0];
-            if (qn) tr.addMark(pos, pos + c.length, type.create({ rt: Scripts.text(qn, this.kind), qn, side: this.side }));
-            pos += c.length;
-        });
         this.view.dispatch(tr);
         this.close(true);
     },
