@@ -212,8 +212,8 @@ window.notesApp = { store, ready, flush() } is for the tests.
     snack('Added to your notes', 'Đã thêm vào ghi chú của bạn');
   });
 
-  // ----- sharing: the link goes to an Edge Function that gives social media the title and the text, then opens the app -----
-  const SHARE_URL = code => 'https://kfgqhhmdzboszpwsqkxt.supabase.co/functions/v1/share?c=' + code;
+  // ----- sharing: the link opens the app on the document by its code -----
+  const SHARE_URL = code => new URL('#/s/' + code, location.href.split('#')[0]).href;   // later: an address that also gives social media a preview
   let shareState = null;   // { id, code } of the open document
   async function openShareMenu() {
     const doc = state.current;
