@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="robots" content="noindex">
+    <title>Scrolls</title>
+
+    <link href="https://qatt.org/vendor/bootstrap/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://qatt.org/css/site.css">
+    <link rel="stylesheet" href="https://qatt.org/vendor/bootstrap-icons/bootstrap-icons.min.css">
+
+    <script src="https://qatt.org/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
+    <script src="https://qatt.org/vendor/supabase/supabase.min.js"></script>
+    <script src="https://qatt.org/js/navigation.js"></script>
+    <script src="https://qatt.org/js/supabase.js"></script>
+    <script src="https://qatt.org/js/login.js"></script>
+
+    <style>
+        :root { --ink: #2b2118; --cinnabar: #a8362a; --paper: #f7efdc; --line: #e4d9c0; --muted: #7b6c58; }
+        body { min-height: 100vh; color: var(--ink); background: #fffdf8; }
+        .hero {
+            background:
+                radial-gradient(60rem 22rem at 50% -6rem, rgba(168, 54, 42, .10), transparent 70%),
+                linear-gradient(180deg, var(--paper) 0%, #fffdf8 100%);
+            border-bottom: 1px solid #e8dcc0;
+            color: var(--ink);
+        }
+        .hero h1 { font-family: Georgia, "Times New Roman", serif; font-weight: 400; font-size: clamp(2.2rem, 7vw, 3.6rem); letter-spacing: .01em; }
+        .hero .han { color: var(--cinnabar); font-size: 1.25rem; letter-spacing: .5em; padding-left: .5em; }
+        .hero .lead { max-width: 38rem; color: #4a3d30; }
+        .card-box { padding: 1rem; margin-bottom: .6rem; background: #fffdf8; border: 1px solid var(--line); border-radius: .7rem; box-shadow: 0 .35rem 1rem rgba(60, 40, 20, .14); }
+        .text-secondary { color: var(--muted) !important; }
+        .section-header h6 { letter-spacing: .12em; }
+
+        /* a scroll in the list: the whole upper part opens it */
+        .scroll-top { cursor: pointer; }
+        .scroll-icon { width: 3rem; height: 3rem; flex: none; border-radius: .7rem; display: flex; align-items: center; justify-content: center; font-size: 1.4rem; color: var(--cinnabar); background: color-mix(in srgb, currentColor 8%, transparent); }
+        .scroll-title { font-weight: 600; font-family: var(--font-cjk), serif; overflow-wrap: anywhere; }
+        .empty-box { background: color-mix(in srgb, currentColor 4%, transparent); border: 1px dashed var(--line); }
+        .account-footer { margin-top: 3rem; text-align: center; font-size: .85rem; color: var(--muted); }
+        .account-footer a { color: var(--cinnabar); text-decoration: none; }
+    </style>
+</head>
+<body>
+
+    <header class="hero pt-4 pt-sm-5 pb-4 mb-4">
+        <div class="container text-center">
+            <div class="han mb-2">卷</div>
+            <h1 class="mb-3" data-vi="Cuốn">Scrolls</h1>
+            <p class="lead mx-auto mb-4">Write documents in the style of old Asian texts, horizontal or vertical.</p>
+            <button type="button" class="btn btn-cinnabar btn-pill" id="new-scroll"><i class="bi bi-plus-lg me-1"></i> <span data-vi="Cuốn mới">New scroll</span></button>
+        </div>
+    </header>
+
+    <main class="container pb-5" style="max-width: 62rem">
+        <div class="pb-2 mb-3 section-header">
+            <h6 class="text-secondary text-uppercase mb-0 small" data-vi="Cuốn của tôi">My scrolls</h6>
+        </div>
+        <div id="scroll-list"><div role="status"><span class="visually-hidden">Loading…</span></div></div>
+        <footer id="account" class="account-footer"></footer>
+    </main>
+
+    <script>
+        class ScrollList {
+            constructor() { this.sp = new SupabaseService(); this.busy = false; }
+
+            signedIn() { return !!this.sp.user && !this.sp.isAnonymous; }
+
+            async init() {
+                try { await this.sp.init(); } catch (e) { console.error('Init failed:', e); }
+                this.renderAccount();
+                document.getElementById('new-scroll').addEventListener('click', () => this.create());
+                await this.load();
+            }
+
+            // the list needs id, title and date only; the content is loaded by the editor
+            async load() {
+                const box = document.getElementById('scroll-list');
+                if (!this.signedIn()) return this.message(box, 'Sign in to see your scrolls.', 'Đăng nhập để xem các cuốn của bạn.', true);
+                const { data, error } = await this.sp.client.from('scrolls').select('id, title, updated_at').order('updated_at', { ascending: false });
+                if (error) { console.error('Loading scrolls failed:', error); return this.message(box, 'The scrolls could not be loaded.', 'Không tải được các cuốn.'); }
+                if (!data.length) return this.message(box, 'No scrolls yet. Create your first one.', 'Chưa có cuốn nào. Hãy tạo cuốn đầu tiên.');
+                box.replaceChildren(...data.map(s => this.card(s)));
+            }
+
+            message(box, en, vi, signIn) {
+                const div = document.createElement('div');
+                div.className = 'p-4 text-center text-secondary rounded-3 small empty-box';
+                const t = document.createElement('span');
+                t.setAttribute('data-vi', vi);
+                t.textContent = en;
+                div.append(t);
+                if (signIn) {
+                    const b = document.createElement('button');
+                    b.type = 'button';
+                    b.className = 'btn btn-sm btn-cinnabar px-3 d-block mx-auto mt-2';
+                    b.setAttribute('data-vi', 'Đăng nhập');
+                    b.textContent = 'Sign in';
+                    b.addEventListener('click', () => QattLogin.open(this.sp));
+                    div.append(b);
+                }
+                box.replaceChildren(div);
+            }
+
+            card(s) {
+                const open = () => { location.href = 'edit.html?id=' + encodeURIComponent(s.id); };
+                const card = document.createElement('div');
+                card.className = 'card-box';
+
+                const top = document.createElement('div');
+                top.className = 'd-flex align-items-center gap-3 scroll-top';
+                top.addEventListener('click', open);
+                const icon = document.createElement('span');
+                icon.className = 'scroll-icon';
+                icon.innerHTML = '<i class="bi bi-file-text"></i>';
+                const text = document.createElement('div');
+                text.className = 'flex-grow-1';
+                const title = document.createElement('div');
+                title.className = 'scroll-title';
+                if (s.title) title.textContent = s.title;
+                else { title.setAttribute('data-vi', 'Chưa đặt tên'); title.textContent = 'Untitled'; title.classList.add('text-secondary'); }
+                const date = document.createElement('small');
+                date.className = 'text-secondary';
+                date.textContent = new Date(s.updated_at).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' });
+                text.append(title, date);
+
+                const del = document.createElement('button');
+                del.type = 'button';
+                del.className = 'btn btn-sm btn-link text-secondary text-decoration-none';
+                del.setAttribute('aria-label', 'Delete');
+                del.setAttribute('data-vi-aria-label', 'Xóa');
+                del.innerHTML = '<i class="bi bi-trash"></i>';
+                del.addEventListener('click', async e => {
+                    e.stopPropagation();
+                    const name = s.title || (window.Lang ? Lang.t('Untitled', 'Chưa đặt tên') : 'Untitled');
+                    const ask = window.Lang ? Lang.t(`Delete "${name}"? This cannot be undone.`, `Xóa "${name}"? Không thể hoàn tác.`) : `Delete "${name}"?`;
+                    if (!confirm(ask)) return;
+                    del.disabled = true;
+                    const { error } = await this.sp.client.from('scrolls').delete().eq('id', s.id);
+                    if (error) { del.disabled = false; console.error(error); return alert(window.Lang ? Lang.t('Could not delete the scroll.', 'Không xóa được cuốn.') : 'Could not delete the scroll.'); }
+                    this.load();
+                });
+
+                top.append(icon, text, del);
+                card.append(top);
+                return card;
+            }
+
+            async create() {
+                if (this.busy) return;
+                if (!this.signedIn()) return QattLogin.open(this.sp, window.Lang ? Lang.t('Sign in to create scrolls.', 'Đăng nhập để tạo cuốn.') : 'Sign in to create scrolls.');
+                this.busy = true;
+                const { data, error } = await this.sp.client.from('scrolls').insert({}).select('id').single();
+                this.busy = false;
+                if (error) { console.error('Creating failed:', error); return alert(window.Lang ? Lang.t('Could not create the scroll.', 'Không tạo được cuốn.') : 'Could not create the scroll.'); }
+                location.href = 'edit.html?id=' + encodeURIComponent(data.id);
+            }
+
+            renderAccount() {
+                const box = document.getElementById('account');
+                box.replaceChildren();
+                if (!this.signedIn()) return;
+                const label = document.createElement('span');
+                label.setAttribute('data-vi', 'Đã đăng nhập:');
+                label.textContent = 'Signed in as';
+                const out = document.createElement('a');
+                out.href = '#';
+                const outText = document.createElement('span');
+                outText.setAttribute('data-vi', 'Đăng xuất');
+                outText.textContent = 'Sign out';
+                out.append(outText);
+                out.addEventListener('click', async e => { e.preventDefault(); await this.sp.signOut(); location.reload(); });
+                box.append(label, ` ${this.sp.user.email || 'you'} · `, out);
+            }
+        }
+
+        window.addEventListener('load', () => new ScrollList().init());
+    </script>
+</body>
+</html>
