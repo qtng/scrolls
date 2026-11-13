@@ -7,12 +7,35 @@
     <title>Scroll</title>
     <link href="https://qatt.org/vendor/bootstrap/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://qatt.org/css/site.css">
-    <script src="https://qatt.org/js/navigation.js"></script>
+    <link rel="stylesheet" href="/scrolls/css/scrolls.css">
+    <link rel="stylesheet" href="https://qatt.org/vendor/bootstrap-icons/bootstrap-icons.min.css">
+    <link rel="stylesheet" href="/scrolls/css/prosemirror.css">
+    <link rel="stylesheet" href="/scrolls/css/editor.css">
+
+    <script src="https://qatt.org/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
+    <script src="https://qatt.org/vendor/supabase/supabase.min.js"></script>
+    <script src="/scrolls/js/boot.js"></script>
+    <script src="https://qatt.org/js/supabase.js"></script>
+    <script src="https://qatt.org/js/login.js"></script>
+    <script src="/chunom/js/ime.js"></script>
+    <script src="/scrolls/js/prosemirror.js"></script>
 </head>
 <body>
-    <main class="container py-5 text-center">
-        <p class="text-secondary"><span data-vi="Trình soạn thảo đang được xây dựng.">The editor is being built.</span></p>
-        <a href="/scrolls/" class="btn btn-quiet btn-pill" data-vi="Quay lại">Back</a>
+    <div class="scroll-bar">
+        <a href="/scrolls/" class="btn btn-quiet btn-sm back" aria-label="All scrolls" data-vi-aria-label="Tất cả các cuốn"><i class="bi bi-arrow-left"></i></a>
+        <input id="title" class="title-input" type="text" placeholder="Untitled" data-vi-placeholder="Chưa đặt tên" aria-label="Title" data-vi-aria-label="Tiêu đề" autocomplete="off">
+        <span id="status" class="status" aria-live="polite"></span>
+        <button id="telex" type="button" class="btn btn-quiet btn-sm telex" aria-pressed="true" title="Vietnamese typing (Telex) and Chữ Nôm candidates" data-vi-title="Gõ tiếng Việt (Telex) và gợi ý chữ Nôm"><span class="han">喃</span></button>
+        <select id="font" class="form-select form-select-sm" data-qatt-fonts aria-label="Font" data-vi-aria-label="Phông chữ"></select>
+        <select id="size" class="form-select form-select-sm" aria-label="Size" data-vi-aria-label="Cỡ chữ">
+            <option value="16">16</option><option value="18">18</option><option value="20">20</option><option value="22" selected>22</option>
+            <option value="24">24</option><option value="28">28</option><option value="32">32</option><option value="40">40</option>
+        </select>
+    </div>
+    <main class="page">
+        <div id="message" class="message" hidden></div>
+        <div id="editor"></div>
     </main>
+    <script src="/scrolls/js/editor.js"></script>
 </body>
 </html>

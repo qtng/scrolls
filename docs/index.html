@@ -8,28 +8,28 @@
 
     <link href="https://qatt.org/vendor/bootstrap/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://qatt.org/css/site.css">
+    <link rel="stylesheet" href="/scrolls/css/scrolls.css">
     <link rel="stylesheet" href="https://qatt.org/vendor/bootstrap-icons/bootstrap-icons.min.css">
 
     <script src="https://qatt.org/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
     <script src="https://qatt.org/vendor/supabase/supabase.min.js"></script>
-    <script src="https://qatt.org/js/navigation.js"></script>
+    <script src="/scrolls/js/boot.js"></script>
     <script src="https://qatt.org/js/supabase.js"></script>
     <script src="https://qatt.org/js/login.js"></script>
 
     <style>
-        :root { --ink: #2b2118; --cinnabar: #a8362a; --paper: #f7efdc; --line: #e4d9c0; --muted: #7b6c58; }
-        body { min-height: 100vh; color: var(--ink); background: #fffdf8; }
+        body { min-height: 100vh; }
         .hero {
             background:
                 radial-gradient(60rem 22rem at 50% -6rem, rgba(168, 54, 42, .10), transparent 70%),
-                linear-gradient(180deg, var(--paper) 0%, #fffdf8 100%);
+                linear-gradient(180deg, var(--paper-2) 0%, var(--paper) 100%);
             border-bottom: 1px solid #e8dcc0;
             color: var(--ink);
         }
         .hero h1 { font-family: Georgia, "Times New Roman", serif; font-weight: 400; font-size: clamp(2.2rem, 7vw, 3.6rem); letter-spacing: .01em; }
         .hero .han { color: var(--cinnabar); font-size: 1.25rem; letter-spacing: .5em; padding-left: .5em; }
         .hero .lead { max-width: 38rem; color: #4a3d30; }
-        .card-box { padding: 1rem; margin-bottom: .6rem; background: #fffdf8; border: 1px solid var(--line); border-radius: .7rem; box-shadow: 0 .35rem 1rem rgba(60, 40, 20, .14); }
+        .card-box { padding: 1rem; margin-bottom: .6rem; background: var(--paper); border: 1px solid var(--line); border-radius: .7rem; box-shadow: 0 .35rem 1rem rgba(60, 40, 20, .14); }
         .text-secondary { color: var(--muted) !important; }
         .section-header h6 { letter-spacing: .12em; }
 
