@@ -344,18 +344,6 @@ const placeholderPlugin = new Plugin({
 });
 
 // ---------------------------------------------------------------- the toolbar (fixed: under the title bar, on a phone at the bottom)
-// a new section after the block with the caret (an empty paragraph there becomes the section)
-function newSection(view, dir) {
-    const { state } = view, { $from } = state.selection;
-    if ($from.depth !== 2) return;
-    if (!($from.parent.type === S.paragraph && !$from.parent.content.size)) {
-        const pos = $from.after(2), tr = state.tr.insert(pos, S.paragraph.create());
-        tr.setSelection(TextSelection.create(tr.doc, pos + 1));
-        view.dispatch(tr);
-    }
-    insertSection(view, dir);
-}
-
 const UI = {
     view: null,
     // the phone (narrow or touch): the toolbar sits at the bottom, above the keyboard and above the bottom bar of the site
@@ -385,10 +373,26 @@ const UI = {
         this.colsNum = el('span', { className: 'num' });
         titled(this.colsNum, 'Characters per column', 'Số chữ mỗi cột');
         this.bMore = btn(icon('bi-plus'), 'More characters per column', 'Nhiều chữ hơn mỗi cột', () => this.setSection({ step: 1 }));
-        this.bNewH = btn(el('span', { className: 'new-sec' }, icon('bi-plus'), han('橫')), 'New horizontal section', 'Phần ngang mới', () => newSection(this.view, 'h'));
-        this.bNewV = btn(el('span', { className: 'new-sec' }, icon('bi-plus'), han('直')), 'New vertical section', 'Phần dọc mới', () => newSection(this.view, 'v'));
         this.bDel = btn(icon('bi-trash'), 'Delete section', 'Xóa phần', () => this.deleteSection());
-        this.bar.append(this.bH1, this.bH2, this.bWari, this.bRuby, sep(), this.bH, this.bV, this.bLess, this.colsNum, this.bMore, sep(), this.bNewH, this.bNewV, sep(), this.bDel);
+        this.bar.append(this.bH1, this.bH2, this.bWari, this.bRuby, sep(), this.bH, this.bV, this.bLess, this.colsNum, this.bMore, sep(), this.bDel);
+
+        // the plus on an empty line (floating, as on Medium): a new section there
+        this.plus = el('button', { type: 'button', className: 'scroll-plus', hidden: true });
+        this.plus.append(icon('bi-plus-lg'));
+        titled(this.plus, 'New section', 'Phần mới');
+        this.plus.addEventListener('mousedown', e => e.preventDefault());
+        this.plus.addEventListener('click', () => { this.menuOpen = !this.menuOpen; this.refresh(); });
+        const item = (h, en, viText, dir) => {
+            const b = btn(han(h), en, viText, () => { this.menuOpen = false; insertSection(this.view, dir); });
+            b.append(vi(en, viText));
+            return b;
+        };
+        this.plusMenu = el('div', { className: 'scroll-ui scroll-plus-menu', hidden: true },
+            item('橫', 'Horizontal section', 'Phần ngang', 'h'), item('直', 'Vertical section', 'Phần dọc', 'v'));
+        document.body.append(this.plus, this.plusMenu);
+        document.addEventListener('pointerdown', e => {
+            if (this.menuOpen && !this.plusMenu.contains(e.target) && !this.plus.contains(e.target)) { this.menuOpen = false; this.refresh(); }
+        });
 
         const pos = () => this.position();
         if (window.visualViewport) for (const ev of ['resize', 'scroll']) visualViewport.addEventListener(ev, pos);
@@ -432,6 +436,24 @@ const UI = {
         this.bMore.disabled = !vert || a.cols >= MAX_COLS;
         this.bDel.disabled = state.doc.childCount < 2;
         this.position();
+
+        // the plus on an empty paragraph (vertical: above the column, horizontal: left of the line) and its menu under it
+        const emptyLine = view.hasFocus() && sel.empty && $f.depth === 2 && p.type === S.paragraph && !p.content.size;
+        if (!emptyLine) this.menuOpen = false;
+        this.plus.hidden = !emptyLine;
+        this.plusMenu.hidden = !(emptyLine && this.menuOpen);
+        if (emptyLine) {
+            const c = view.coordsAtPos($f.pos), size = this.plus.offsetWidth || 32;
+            const x = vert ? (c.left + c.right) / 2 - size / 2 : c.left - size - 12, y = vert ? c.top - size - 10 : (c.top + c.bottom) / 2 - size / 2;
+            this.plus.style.left = Math.max(4, x) + scrollX + 'px';
+            this.plus.style.top = Math.max(4, y) + scrollY + 'px';
+            this.plus.classList.toggle('open', !!this.menuOpen);
+            if (this.menuOpen) {
+                const r = this.plus.getBoundingClientRect(), w = this.plusMenu.offsetWidth, vw = document.documentElement.clientWidth;
+                this.plusMenu.style.left = Math.max(8, Math.min(r.left, vw - w - 8)) + 'px';
+                this.plusMenu.style.top = r.bottom + 6 + 'px';
+            }
+        }
     },
     setSection({ dir, step }) {
         const view = this.view, sec = sectionAt(view.state.selection.$from), a = sec.node.attrs;
@@ -596,7 +618,10 @@ const RubyBox = {
     },
 };
 
-const uiPlugin = new Plugin({ view: () => ({ update: () => UI.refresh() }) });
+const uiPlugin = new Plugin({
+    view: () => ({ update: () => UI.refresh() }),
+    props: { handleDOMEvents: { focus: () => { setTimeout(() => UI.refresh()); return false; }, blur: () => { setTimeout(() => UI.refresh()); return false; } } },
+});
 
 // ---------------------------------------------------------------- ime.js (Telex, Chữ Nôm candidates) on the editor
 // VietIme works on a field; this adapter shows it the text of the block with the caret
@@ -639,7 +664,7 @@ const imeKeys = new Plugin({
         handleKeyDown(view, e) {
             if (!ime || !ime.visible || e.isComposing) return false;
             if (['ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Escape'].includes(e.key)) return true;
-            if (e.key === 'Enter' && ime.active >= 0 && !(e.shiftKey || e.ctrlKey || e.metaKey || e.altKey)) return true;
+            if (e.key === 'Enter' && !(e.shiftKey || e.ctrlKey || e.metaKey || e.altKey)) return true;   // Enter takes the candidate (returnSelect)
             return false;
         },
     },
@@ -786,7 +811,7 @@ async function start() {
     let telexOn = true;
     try { telexOn = localStorage.getItem('scrollsTelex') !== '0'; } catch (e) { /* default */ }
     const adapter = new ImeAdapter(editor);
-    ime = new VietIme(adapter, { defer: true, telex: telexOn, candidates: telexOn });
+    ime = new VietIme(adapter, { defer: true, telex: telexOn, candidates: telexOn, returnSelect: true });
     adapter.ime = ime;
     const setTelex = on => {
         telexOn = on;
