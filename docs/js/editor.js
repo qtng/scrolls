@@ -4,7 +4,7 @@ The editor of a scroll (edit.html?id=<uuid>; edit.html?local: a test mode withou
 A scroll is sections of blocks: doc > section+ > (paragraph | heading)+. A section is horizontal (flowing text) or vertical
 (columns of `cols` characters, right to left, continued in bands below). Two-column text (warichu) is a mark; editor.js lays it
 out as segments (inline decorations), the bands of vertical sections get their height here. ProseMirror comes from js/prosemirror.js
-(window.PM, built in the private repository), the Telex input and the Chữ Nôm candidates from /chunom/js/ime.js.
+(window.PM, built in the private repository), the Telex input from /chunom/js/ime.js (no candidate list).
 */
 (() => {
 'use strict';
@@ -640,7 +640,7 @@ const uiPlugin = new Plugin({
     props: { handleDOMEvents: { focus: () => { setTimeout(() => UI.refresh()); return false; }, blur: () => { setTimeout(() => UI.refresh()); return false; } } },
 });
 
-// ---------------------------------------------------------------- ime.js (Telex, Chữ Nôm candidates) on the editor
+// ---------------------------------------------------------------- ime.js (Telex only) on the editor
 // VietIme works on a field; this adapter shows it the text of the block with the caret
 class ImeAdapter {
     constructor(view) { this.view = view; this.imeTarget = view.dom; this.style = {}; this.readOnly = false; this.tagName = 'DIV'; }
@@ -823,17 +823,17 @@ async function start() {
     UI.refresh();
     window.scrollsEditor = editor;   // for tests
 
-    // Telex and the candidates: on unless switched off (kept in this browser)
+    // Telex (no Chữ Nôm candidates in the editor): on unless switched off (kept in this browser)
     const telexBtn = $('telex');
     let telexOn = true;
     try { telexOn = localStorage.getItem('scrollsTelex') !== '0'; } catch (e) { /* default */ }
     const adapter = new ImeAdapter(editor);
-    ime = new VietIme(adapter, { defer: true, telex: telexOn, candidates: telexOn, returnSelect: true });
+    ime = new VietIme(adapter, { defer: true, telex: telexOn, candidates: false });
     adapter.ime = ime;
     const setTelex = on => {
         telexOn = on;
         telexBtn.setAttribute('aria-pressed', on ? 'true' : 'false');
-        ime.update({ telex: on, candidates: on });
+        ime.update({ telex: on, candidates: false });
         if (RubyBox.ime) RubyBox.ime.update({ telex: on, candidates: false });
         try { localStorage.setItem('scrollsTelex', on ? '1' : '0'); } catch (e) { /* only for this page */ }
     };
