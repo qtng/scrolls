@@ -8,7 +8,7 @@ the next start uses the new files). Keep PRECACHE equal to what index.html loads
   - the dictionaries of ime.js: cached when first loaded and at install
   - the account (supabase.co) is never cached
 */
-const CACHE = 'nom-notes-v16';
+const CACHE = 'nom-notes-v18';
 const HERE = new URL('./', self.location).href;
 const at = p => new URL(p, HERE).href;
 const CDN = 'https://cdn.qatt.org/fonts/';

@@ -321,6 +321,30 @@ const measure = {
         }
         return this.cache.get(key);
     },
+    // horizontal: how far the middle of the ink of the two small lines lies below the middle of the ink of the line, in px. The baselines are
+    // measured in the DOM (a marker of no size on each baseline), the ink above the baseline in a canvas (the middle of 國 in the font)
+    segShiftH(cs) {
+        const font = `${cs.fontStyle} ${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`, key = 'shiftH\n' + font;
+        if (!this.cache.has(key)) {
+            const mark = () => { const i = el('i'); i.style.cssText = 'display:inline-block;width:0;height:0;vertical-align:baseline;'; return i; };
+            const pr = el('div', { ariaHidden: 'true' });
+            pr.style.cssText = 'position:absolute;left:0;top:0;visibility:hidden;white-space:pre;writing-mode:horizontal-tb;';
+            pr.style.font = font;
+            const m0 = mark(), seg = el('span'), lines = [0, 1].map(() => { const d = el('div'); d.append('\u570b', mark()); return d; });
+            seg.style.cssText = 'display:inline-block;box-sizing:content-box;font-size:.5em;line-height:1;block-size:2em;inline-size:1em;vertical-align:text-top;';
+            seg.append(...lines);
+            pr.append('\u570b', m0, seg);
+            document.body.append(pr);
+            const base = i => i.getBoundingClientRect().bottom;
+            const ctx = (this.canvas ||= document.createElement('canvas')).getContext('2d');
+            ctx.font = font;
+            const t = ctx.measureText('\u570b'), mid = (t.actualBoundingBoxAscent - t.actualBoundingBoxDescent) / 2;   // the ink middle above the baseline
+            const main = base(m0) - mid, small = (base(lines[0].lastChild) + base(lines[1].lastChild)) / 2 - mid / 2;
+            this.cache.set(key, Number.isFinite(mid) ? small - main : 0);
+            pr.remove();
+        }
+        return this.cache.get(key);
+    },
 };
 
 // The segments of a run of two-column text (chars: code points, widths: their advances in px). The grid of the old prints: a segment takes
@@ -439,7 +463,7 @@ class Layout {
                 l: parseFloat(cs.paddingLeft) + parseFloat(cs.borderLeftWidth), r: parseFloat(cs.paddingRight) + parseFloat(cs.borderRightWidth) };
             const len = v ? (+sec.dataset.cols || DEFAULT_COLS) * em : sec.offsetWidth - pad.l - pad.r;
             info.set(sec, { v, gap, len, pad, pitch: len + gap });
-            if (v) sec.style.setProperty('--seg-shift', measure.segShift(cs).toFixed(2) + 'px');   // two-column text on the axis of its column
+            sec.style.setProperty('--seg-shift', (v ? measure.segShift(cs) : measure.segShiftH(cs)).toFixed(2) + 'px');   // two-column text on the axis of its line
             if (v) sec.style.height = (200 * (len + gap) + pad.t + pad.b) + 'px';   // generous first, cut to whole bands below
         }
         const runs = wariRuns(view.state.doc), mks = view.dom.querySelectorAll('i.mk');
