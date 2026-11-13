@@ -194,8 +194,8 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .appbar .size-btn[aria-expanded="true"] { color: var(--accent); border-color: var(--accent); }
 .appbar .pop .menu { top: calc(100% + 6px); left: 0; right: auto; min-width: 0; padding: .4rem; }
 /* the title above the pages: a tap edits it */
-.doc-head { max-width: 46rem; margin: 0 auto .75rem; }
-.doc-title { display: block; width: 100%; min-height: 2.4rem; margin: 0; padding: .2rem .25rem; font-family: var(--doc-font), var(--nom), system-ui, sans-serif; font-size: 1.6rem; line-height: 1.3; color: var(--ink);
+.doc-head { width: calc(var(--page-em, 22) * var(--unit, 32px)); max-width: none; margin: 0 auto .75rem; }   /* as wide as the page; zoomed with it */
+.doc-title { display: block; width: 100%; min-height: 1.5em; margin: 0; padding: .1em .15em; font-family: var(--doc-font), var(--nom), system-ui, sans-serif; font-size: calc(var(--unit, 32px) * 1.2); line-height: 1.3; color: var(--ink);
   overflow-wrap: anywhere; cursor: text; }
 .doc-title.untitled { color: var(--muted); opacity: .6; }
 input.doc-title { border: 1px solid var(--line); border-radius: 8px; background: rgba(255, 255, 255, .08); outline: 0; }
@@ -239,5 +239,5 @@ input.doc-title:focus { border-color: var(--accent); }
 .ProseMirror .sec { background: none; box-shadow: none; outline: 0; border-radius: 0; }
 
 /* the title: a dotted line below it, like the lines between the pages; a tap sets it only while editing */
-#view-editor .doc-head { padding-bottom: .5rem; border-bottom: 1px dotted color-mix(in srgb, var(--field-ink, var(--ink)) 35%, transparent); margin-bottom: 1rem; }
+#view-editor .doc-head { padding-bottom: calc(var(--unit, 32px) * .25); border-bottom: 1px dotted color-mix(in srgb, var(--field-ink, var(--ink)) 35%, transparent); margin-bottom: calc(var(--unit, 32px) * .5); }
 #view-editor.reading .doc-title { cursor: default; }
