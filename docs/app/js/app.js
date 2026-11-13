@@ -157,7 +157,7 @@ window.notesApp = { store, ready, flush() } is for the tests.
   });
 
   function showEditor(doc, fresh, shared) {
-    state.shared = !!shared; $('view-editor').classList.toggle('shared', !!shared); $('keep-btn').hidden = !shared;
+    state.shared = !!shared; $('view-editor').classList.toggle('shared', !!shared); $('keep-btn').hidden = $('home-logo').hidden = !shared;
     state.current = doc; state.inStore = !fresh; state.dirty = false;
     closeMenu();
     $('view-list').hidden = true;
@@ -172,7 +172,7 @@ window.notesApp = { store, ready, flush() } is for the tests.
   }
   async function showList() {
     await save();
-    state.current = null; state.shared = false;
+    state.current = null; state.shared = false; $('view-editor').classList.remove('shared');
     closeMenu();
     NomEditor.setEditable(false);
     $('view-editor').hidden = true;
@@ -191,17 +191,22 @@ window.notesApp = { store, ready, flush() } is for the tests.
     if (!doc) { history.replaceState(null, '', '#/'); return showList(); }
     showEditor({ ...doc }, false);
   }
-  // a link of somebody: the document is loaded by its code and shown for reading; the owner of it goes to his own document
+  // a link: the document is loaded by its code and shown for reading (the logo leads to the list when signed in, else to the homepage)
   async function showShared(code) {
     if (state.shared && state.current && state.shared === code) return;
     await save();
     let doc = null;
     try { doc = await DocsSync.shareGet(code); } catch (e) { console.error('Share failed:', e); }
-    if (!doc) { snack('This link is not valid (any more)', 'Liên kết này không (còn) hiệu lực'); history.replaceState(null, '', '#/'); return showList(); }
-    if (state.docs.some(d => d.id === doc.id)) { history.replaceState(null, '', '#/n/' + encodeURIComponent(doc.id)); return route(); }
+    if (!doc) { snack('This link is not valid (any more)', 'Liên kết này không (còn) hiệu lực'); state.invalidLink = true; history.replaceState(null, '', '#/'); return showList(); }
     showEditor(doc, false, true);
     state.shared = code;
+    $('keep-btn').hidden = state.docs.some(d => d.id === doc.id);   // a copy only of somebody else's document
   }
+  $('home-logo').addEventListener('click', e => {
+    if (!DocsSync.user) return;   // not signed in: the link to the homepage
+    e.preventDefault();
+    history.replaceState(null, '', '#/'); route();
+  });
   $('keep-btn').addEventListener('click', async () => {   // a copy in my notes
     const src = state.current; if (!src || !state.shared) return;
     const now = Date.now(), doc = { ...src, id: newId(), created: now, updated: now, synced: 0 };
@@ -669,7 +674,7 @@ window.notesApp = { store, ready, flush() } is for the tests.
     renderAccount();
     if (DocsSync.user) await sync();   // the documents of the account first: a new device shows them at once
     await route();
-    if (state.docs.length === 0 && !state.current) $('new-note').click();   // nothing written yet: straight to the editor
+    if (state.docs.length === 0 && !state.current && !state.invalidLink) $('new-note').click();   // nothing written yet: straight to the editor
     resume();
     app.ready = true;
   })();

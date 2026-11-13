@@ -222,3 +222,6 @@ input.doc-title:focus { border-color: var(--accent); }
 
 /* shared (somebody else's link): reading only; the owner shares and ends the link from the bar */
 #view-editor.shared #edit-btn, #view-editor.shared #share-btn { display: none; }
+.home-logo { flex: none; display: grid; place-items: center; width: 44px; height: 44px; }
+.home-logo img { width: 36px; height: 36px; border-radius: 8px; }
+#view-editor.shared #back { display: none; }
