@@ -133,29 +133,28 @@ window.notesApp = { store, ready, flush() } is for the tests.
     else if (e.key === 'Escape') { e.preventDefault(); editTitle(false, false); }
   });
 
-  // reading mode (an existing document opens read-only, no keyboard) and editing mode (a new document, the pencil of the bar, a double tap in the text)
-  function setEditing(on) {
+  // reading mode (a document opens read-only: text, zoom slider, pencil) and editing mode (all toolbars; "back" leads to the reading mode, once more to the list).
+  // Editing is an entry of its own in the history (state.edit), so the back button of the phone does the same.
+  function setEditing(on, push) {
+    if (on && push && !(history.state && history.state.edit)) history.pushState({ fromList: true, edit: true }, '', location.hash);
     NomEditor.setEditable(on);
-    $('edit-btn').querySelector('i').className = on ? 'fa-solid fa-check' : 'fa-solid fa-pencil';
-    $('edit-btn').setAttribute('aria-pressed', String(on));
-    $('edit-btn').setAttribute('aria-label', on ? Lang.t('Done', 'Xong') : Lang.t('Edit', 'Chỉnh sửa'));
     $('view-editor').classList.toggle('reading', !on);
     buttons();
     renderKeys();
   }
-  $('edit-btn').addEventListener('click', () => { const on = !NomEditor.editable; setEditing(on); if (on) NomEditor.focus(); else save(); });
+  const stopEditing = () => { setEditing(false); save(); };
+  $('edit-btn').addEventListener('click', () => { setEditing(true, true); NomEditor.focus(); });
   let lastTap = { t: 0, x: 0, y: 0 };
   $('field').addEventListener('pointerup', e => {   // a double tap in the reading view starts editing there (dblclick is not sent on every phone)
     if (NomEditor.editable) return;
     if (e.timeStamp - lastTap.t < 350 && Math.hypot(e.clientX - lastTap.x, e.clientY - lastTap.y) < 30) {
       lastTap.t = 0;
-      setEditing(true);
+      setEditing(true, true);
       const view = NomEditor.view, at = view.posAtCoords({ left: e.clientX, top: e.clientY });
       NomEditor.focus();
       if (at) view.dispatch(view.state.tr.setSelection(PM.TextSelection.near(view.state.doc.resolve(at.pos))));
     } else lastTap = { t: e.timeStamp, x: e.clientX, y: e.clientY };
   });
-  document.addEventListener('langchange', () => setEditing(NomEditor.editable));
 
   function showEditor(doc, fresh) {
     state.current = doc; state.inStore = !fresh; state.dirty = false;
@@ -167,7 +166,7 @@ window.notesApp = { store, ready, flush() } is for the tests.
     if (!NomEditor.open(doc.content || null, edited)) snack('Parts of this document could not be read', 'Không đọc được một phần của ghi chú này', { sticky: true });
     $('field').scrollTop = 0;
     showTitle();
-    setEditing(fresh);
+    setEditing(fresh, false);
     if (fresh) NomEditor.focus();
   }
   async function showList() {
@@ -189,12 +188,16 @@ window.notesApp = { store, ready, flush() } is for the tests.
     if (!doc) { history.replaceState(null, '', '#/'); return showList(); }
     showEditor({ ...doc }, false);
   }
-  window.addEventListener('popstate', route);
+  window.addEventListener('popstate', async () => {
+    if (NomEditor.editable && !(history.state && history.state.edit) && /^#\/n\//.test(location.hash)) { stopEditing(); return; }
+    route();
+  });
   const go = hash => { history.pushState({ fromList: true }, '', hash); return route(); };
   // a new document; the first one ever is on rice paper, later ones get a random style
   function openNew() {
     const now = Date.now(), doc = { id: newId(), content: null, text: '', created: now, updated: now, style: DocStyles.encode(DocStyles.css(state.docs.length === 0 ? styleById('rice-paper') : DocStyles.random())) };
     history.pushState({ fromList: true }, '', '#/n/' + encodeURIComponent(doc.id));
+    history.pushState({ fromList: true, edit: true }, '', location.hash);
     showEditor(doc, true);
   }
   $('new-note').addEventListener('click', () => openNew());
@@ -203,6 +206,7 @@ window.notesApp = { store, ready, flush() } is for the tests.
     if (row) go('#/n/' + encodeURIComponent(row.dataset.id));
   });
   $('back').addEventListener('click', () => {
+    if (NomEditor.editable) { if (history.state && history.state.edit) history.back(); else stopEditing(); return; }
     if (history.state && history.state.fromList) history.back();
     else { history.replaceState(null, '', '#/'); route(); }
   });
@@ -402,12 +406,13 @@ window.notesApp = { store, ready, flush() } is for the tests.
   // the size: 100% is 22 pixels (the size of Scrolls); the grid of the vertical pages follows it
   const setSize = (value, user) => {
     value = Math.min(300, Math.max(50, Number(value) || 100));
-    $('set-size').value = value; $('size-label').textContent = $('size-btn-label').textContent = value + '%';
+    $('set-size').value = $('read-zoom').value = value; $('size-label').textContent = $('size-btn-label').textContent = value + '%';
     document.documentElement.style.setProperty('--doc-size', Math.round(value * 0.22) + 'px');
     if (user) keepFormat('size', value);
     NomEditor.relayout();
   };
   $('set-size').addEventListener('input', () => setSize($('set-size').value, true));
+  $('read-zoom').addEventListener('input', () => setSize($('read-zoom').value, true));
 
   // the rhyme table of the document: the QATT input, the QATT readings of the ruby
   for (const [name, label, vi] of VietnameseParser.TABLES) { const o = new Option(label, name); o.setAttribute('data-vi', vi); $('set-decoding').append(o); }

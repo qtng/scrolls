@@ -89,7 +89,10 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .tools select option, .tools select optgroup { color: var(--ink); background: var(--bg); }
 .tools select:disabled { opacity: .3; }
 .h-icon sub { font-size: .6em; font-weight: 700; bottom: 0; margin-left: 1px; }
-.reading .tools, .reading .ime-select, .reading .page-tools { opacity: .35; pointer-events: none; }   /* reading: the pencil leads to editing */
+/* reading: text, back, zoom slider and pencil only; editing: all the bars (the pencil and the slider are gone) */
+.reading .fmtbar, .reading #undo-btn, .reading #redo-btn, .reading #page-new, .reading #style-btn, .reading #menu-btn { display: none; }
+#view-editor:not(.reading) #edit-btn, #view-editor:not(.reading) .read-zoom { display: none; }
+.read-zoom { flex: 2 1 0; min-width: 0; max-width: 18rem; accent-color: var(--accent); }
 
 /* the field: the pages of the document on the dark desk of the app */
 .field { flex: 1; min-height: 0; overflow-y: auto; padding: 1rem .75rem 40vh; }
@@ -216,4 +219,3 @@ input.doc-title:focus { border-color: var(--accent); }
 .size-btn[aria-expanded="true"] { color: var(--accent); border-color: var(--accent); }
 .fmtbar .page-tools button { width: 40px; height: 40px; }
 .fmtbar .ime-select { max-width: 6.5rem; }
-.reading .bar-btn { opacity: .35; pointer-events: none; }   /* the size stays: also for reading */
