@@ -199,3 +199,8 @@ input.doc-title:focus { border-color: var(--accent); }
 #page-menu .menu-row select { margin-left: auto; padding: .35rem; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--ink); }
 #page-menu .menu-row select optgroup, #page-menu .menu-row select option { background: var(--bg); color: var(--ink); }
 #page-menu button:disabled, #page-menu select:disabled { opacity: .35; }
+
+/* the input in the title bar, the direction at the end of the format bar */
+.appbar .ime-select { flex: 0 1 auto; min-width: 0; max-width: 8.5rem; height: 44px; padding: 0 .3rem; border: 1px solid var(--line); border-radius: 10px; background: transparent; color: inherit; font-size: .85rem; }
+.appbar .ime-select option { color: var(--ink); background: var(--bg); }
+.fmtbar .page-tools button { width: 40px; height: 40px; }
