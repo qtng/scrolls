@@ -470,7 +470,7 @@ const UI = {
             b.append(vi(en, viText));
             return b;
         };
-        this.plusMenu = el('div', { className: 'scroll-ui scroll-plus-menu', hidden: true },
+        this.plusMenu = el('div', { className: 'scroll-ui scroll-plus-menu bg-light', hidden: true },
             item('fa-grip-lines', 'Horizontal section', 'Phần ngang', 'h'), item('fa-grip-lines-vertical', 'Vertical section', 'Phần dọc', 'v'));
         document.body.append(this.plus, this.plusMenu);
         document.addEventListener('pointerdown', e => {
@@ -597,7 +597,7 @@ const RubyBox = {
         });
         this.overBtn = btn(el('i', { className: 'bi' }), 'Over (vertical: right)', 'Trên (dọc: bên phải)', () => this.setSide('over'));
         this.underBtn = btn(el('i', { className: 'bi' }), 'Under (vertical: left)', 'Dưới (dọc: bên trái)', () => this.setSide('under'));
-        this.box = el('div', { className: 'scroll-ui ruby-box', hidden: true },
+        this.box = el('div', { className: 'scroll-ui ruby-box bg-light', hidden: true },
             el('div', { className: 'rt-row' }, this.input, this.ok, this.del),
             el('div', { className: 'rt-row' }, this.shown),
             el('div', { className: 'rt-row' }, ...this.kindBtns, el('span', { className: 'sep' }), this.overBtn, this.underBtn, el('span', { className: 'sep' }), this.eachBtn));
