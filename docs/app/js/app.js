@@ -346,13 +346,19 @@ window.notesApp = { store, ready, flush() } is for the tests.
   $('set-ime').addEventListener('change', () => { setIme($('set-ime').value, true); NomEditor.focus(); });
   try { setIme(localStorage.getItem(IME_KEY)); } catch (e) { setIme('qn'); }
 
-  // the keyboard covers the lower part of the screen: the editor view ends above it
-  const vv = window.visualViewport;
+  // the keyboard covers the lower part of the screen: the editor view ends above it. Two measures, the larger counts: the visual viewport (what is
+  // left above the keyboard) and, where there is one (Chrome on Android), the keyboard itself (navigator.virtualKeyboard: its height, the page is not resized)
+  const vv = window.visualViewport, vk = navigator.virtualKeyboard || null;
+  if (vk) { try { vk.overlaysContent = true; } catch (e) { /* the viewport measure stays */ } }
   function fitKeyboard() {
-    const inset = vv ? Math.max(0, window.innerHeight - vv.height - vv.offsetTop) : 0;
-    $('view-editor').style.bottom = inset + 'px';
+    const byViewport = vv ? Math.max(0, window.innerHeight - vv.height - vv.offsetTop) : 0;
+    const byKeyboard = vk && vk.boundingRect ? Math.max(0, vk.boundingRect.height) : 0;
+    $('view-editor').style.bottom = Math.round(Math.max(byViewport, byKeyboard)) + 'px';
   }
   if (vv) { vv.addEventListener('resize', fitKeyboard); vv.addEventListener('scroll', fitKeyboard); }
+  if (vk) vk.addEventListener('geometrychange', fitKeyboard);
+  document.addEventListener('focusin', () => setTimeout(fitKeyboard, 350));   // the keyboard comes after the focus: measure again when it is there
+  document.addEventListener('focusout', () => setTimeout(fitKeyboard, 350));
 
   // ----- menus -----
   const MENUS = [['menu-btn', 'menu'], ['list-menu-btn', 'list-menu'], ['style-btn', 'style-menu'], ['size-btn', 'size-menu'], ['share-btn', 'share-menu']];
