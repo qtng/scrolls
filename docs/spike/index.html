@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="robots" content="noindex">
+    <title>Scrolls: layout spike</title>
+    <link href="https://qatt.org/vendor/bootstrap/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://qatt.org/css/site.css">
+    <script src="https://qatt.org/js/navigation.js"></script>
+    <style>
+        /* A test page for the two hard parts of the editor (not linked):
+           1. vertical sections: a fixed number of characters per column; when no further column fits into the width the text continues in a
+              band below (CSS multicol in the vertical writing mode: its columns stack along the inline axis, i.e. downwards);
+           2. two-column text (warichu): split into inline-block segments at half size, each two lines long (= balanced), breaking with the column. */
+        body { background: #fffdf8; color: #2b2118; }
+        .wrap { max-width: 46rem; margin: 0 auto; padding: 1.5rem 1rem 4rem; }
+        .controls { display: flex; flex-wrap: wrap; gap: .5rem 1rem; align-items: center; font-size: .9rem; margin-bottom: 1rem; }
+        .controls select, .controls input { width: auto; display: inline-block; }
+        textarea#src { width: 100%; height: 12rem; font-family: var(--font-cjk), monospace; font-size: .95rem; }
+
+        #doc { --doc-size: 22px; font-family: var(--qfont, var(--font-cjk)), var(--font-cjk), serif; font-size: var(--doc-size); }
+        .sec { margin: 0 0 2.5rem; }
+        .sec p, .sec h1, .sec h2 { margin: 0; font-weight: normal; }
+        .sec h1 { font-size: 1.6em; }
+        .sec h2 { font-size: 1.25em; }
+
+        /* horizontal section: plain flowing text */
+        .sec.h { line-height: 1.6; }
+        .sec.h h1, .sec.h h2 { line-height: 1.4; margin-bottom: .3em; }
+
+        /* vertical section: the bands */
+        .sec.v {
+            writing-mode: vertical-rl;
+            line-height: 1.6;
+            width: 100%;                          /* the block size of the vertical flow: the width of a band */
+            column-width: calc(var(--cols) * 1em);  /* the inline size of a column of the multicol container = the length of a column of text */
+            column-gap: 1.2em;                    /* the space between two bands */
+            column-fill: auto;                    /* fill band after band, no balancing */
+            column-rule: 1px solid #e4d9c0;
+        }
+        .sec.v h1, .sec.v h2 { margin-left: .3em; }
+
+        /* a segment of two-column text: half size, exactly two lines (one line of the main text), as long as half of its characters */
+        .wari { color: #6b4b2a; }
+        .seg {
+            display: inline-block;
+            font-size: .5em;
+            line-height: 1;
+            block-size: 2em;
+            vertical-align: middle;
+            line-break: anywhere;
+            word-break: break-all;
+        }
+        .mk { display: inline-block; inline-size: 0; block-size: 1em; }
+        .debug .seg { outline: 1px dotted rgba(168, 54, 42, .5); }
+        .note { font-size: .85rem; color: #7b6c58; }
+    </style>
+</head>
+<body>
+<div class="wrap">
+    <h1 class="h4">Scrolls: layout spike</h1>
+    <p class="note">Test page (not linked). <code>=v 10</code> starts a vertical section with 10 characters per column, <code>=h</code> a horizontal one; <code># </code> and <code>## </code> are headings; <code>[[…]]</code> is two-column text. Change the text or the width of the window: the layout follows.</p>
+    <div class="controls">
+        <label>Font <select id="font" class="form-select form-select-sm" data-qatt-fonts></select></label>
+        <label>Size <input id="size" type="number" class="form-control form-control-sm" min="12" max="48" value="22" style="width:5rem"> px</label>
+        <label><input id="dbg" type="checkbox"> outline segments</label>
+        <label><input id="natural" type="checkbox"> no JS height (multicol alone)</label>
+    </div>
+    <textarea id="src" class="form-control mb-4">=v 10
+# 學而第一
+子曰學而時習之不亦說乎[[說悅同學之爲言效也人性皆善而覺有先後後覺者必效先覺之所爲乃可以明善而復其初也習鳥數飛也學之不已如鳥數飛也說喜意也]]有朋自遠方來不亦樂乎[[朋同類也自遠方來則近者可知]]人不知而不慍不亦君子乎[[慍含怒意]]
+=h
+## 有子曰
+其爲人也孝弟而好犯上者鮮矣[[弟好皆去聲鮮上聲下同]]不好犯上而好作亂者未之有也君子務本本立而道生孝弟也者其爲仁之本與[[與平聲]]
+=v 14
+## 曾子曰
+吾日三省吾身[[省悉井反]]爲人謀而不忠乎與朋友交而不信乎傳不習乎[[傳直專反盡己之謂忠以實之謂信傳謂受之於師習謂熟之於己]]</textarea>
+    <div id="doc"></div>
+</div>
+
+<script>
+// ---- the model: sections of blocks of runs (a run is plain or two-column text) ----
+function parse(src) {
+    const secs = [];
+    let cur = null;
+    for (const line of src.split('\n')) {
+        const m = line.match(/^=(v|h)\s*(\d+)?\s*$/);
+        if (m) { cur = { dir: m[1], cols: Math.max(2, +m[2] || 10), blocks: [] }; secs.push(cur); continue; }
+        if (!line.trim()) continue;
+        if (!cur) { cur = { dir: 'v', cols: 10, blocks: [] }; secs.push(cur); }
+        let type = 'p', text = line;
+        if (line.startsWith('## ')) { type = 'h2'; text = line.slice(3); }
+        else if (line.startsWith('# ')) { type = 'h1'; text = line.slice(2); }
+        cur.blocks.push({ type, runs: runsOf(text) });
+    }
+    return secs;
+}
+function runsOf(t) {
+    const out = [], re = /\[\[(.*?)\]\]/g;
+    let i = 0, m;
+    while ((m = re.exec(t))) {
+        if (m.index > i) out.push({ text: t.slice(i, m.index) });
+        if (m[1]) out.push({ text: m[1], wari: true });
+        i = re.lastIndex;
+    }
+    if (i < t.length) out.push({ text: t.slice(i) });
+    return out;
+}
+
+// ---- the view ----
+function render(secs) {
+    const doc = document.getElementById('doc');
+    doc.replaceChildren(...secs.map(sec => {
+        const el = document.createElement('section');
+        el.className = 'sec ' + sec.dir;
+        el.style.setProperty('--cols', sec.cols);
+        el.model = sec;
+        for (const b of sec.blocks) {
+            const be = document.createElement(b.type);
+            for (const r of b.runs) {
+                if (!r.wari) { be.append(r.text); continue; }
+                const w = document.createElement('span');
+                w.className = 'wari';
+                w.dataset.text = r.text;
+                be.append(w);
+            }
+            el.append(be);
+        }
+        return el;
+    }));
+    layoutAll();
+}
+
+function layoutAll() {
+    for (const el of document.querySelectorAll('#doc .sec')) layoutSection(el);
+}
+
+// the bands of a vertical section: with column-fill: auto the multicol container needs a definite inline size (its height); a generous one first,
+// then cut to the bands that hold text. The two-column text is laid out in between (its places do not depend on the height).
+function layoutSection(el) {
+    const sec = el.model, v = sec.dir === 'v';
+    const em = parseFloat(getComputedStyle(el).fontSize);
+    const gap = v ? parseFloat(getComputedStyle(el).columnGap) : 0;
+    const len = v ? sec.cols * em : el.clientWidth;          // the length of a column (vertical) or line (horizontal) in px
+    const pitch = len + gap;                                  // from the start of one band to the next
+    const natural = document.getElementById('natural').checked;
+    if (v) el.style.height = natural ? '' : (200 * pitch) + 'px';
+    for (const w of el.querySelectorAll('.wari')) layoutWari(w, el, v, len, pitch);
+    if (v && !natural) {
+        const top = el.getBoundingClientRect().top;
+        const range = document.createRange();
+        range.selectNodeContents(el);
+        let bottom = top;
+        for (const r of range.getClientRects()) if (r.width || r.height) bottom = Math.max(bottom, r.bottom);
+        const bands = Math.max(1, Math.floor((bottom - top - 1) / pitch) + 1);
+        el.style.height = (bands * pitch - gap) + 'px';
+    }
+}
+
+// two-column text: the first segment fills the rest of the current column, the next ones whole columns, the last one is balanced (ceil(n/2) per line)
+function layoutWari(w, el, v, len, pitch) {
+    const chars = Array.from(w.dataset.text);
+    const mk = document.createElement('i');
+    mk.className = 'mk';
+    w.replaceChildren(mk);
+    const half = parseFloat(getComputedStyle(w).fontSize) / 2;   // the size of a character of the two-column text
+    const box = el.getBoundingClientRect(), r = mk.getBoundingClientRect();
+    let offset = v ? (r.top - box.top) % pitch : (r.left - box.left);
+    if (offset < 0) offset = 0;
+    const fit = px => Math.floor((px + half * 0.05) / half);    // characters of half size in px (a little tolerance for rounding)
+    let perLine = fit(len - offset);
+    if (perLine < 1) perLine = fit(len);                         // no room left: the first segment starts the next column
+    const full = fit(len);
+    const segs = [];
+    let i = 0, cap = 2 * perLine;
+    while (i < chars.length) {
+        const take = Math.min(cap, chars.length - i);
+        const s = document.createElement('span');
+        s.className = 'seg';
+        s.style.inlineSize = Math.ceil(take / 2) + 'em';
+        s.textContent = chars.slice(i, i + take).join('');
+        segs.push(s);
+        i += take;
+        cap = 2 * full;
+    }
+    w.replaceChildren(...segs);
+}
+
+// ---- wiring ----
+const src = document.getElementById('src');
+let timer;
+const update = () => render(parse(src.value));
+src.addEventListener('input', () => { clearTimeout(timer); timer = setTimeout(update, 150); });
+document.getElementById('size').addEventListener('input', e => { document.getElementById('doc').style.setProperty('--doc-size', e.target.value + 'px'); layoutAll(); });
+document.getElementById('dbg').addEventListener('change', e => document.getElementById('doc').classList.toggle('debug', e.target.checked));
+document.getElementById('natural').addEventListener('change', layoutAll);
+document.getElementById('font').addEventListener('change', () => document.fonts.ready.then(layoutAll));
+let rz;
+window.addEventListener('resize', () => { cancelAnimationFrame(rz); rz = requestAnimationFrame(layoutAll); });
+document.addEventListener('DOMContentLoaded', () => {
+    // only the fonts with Chữ Nôm (cjk: true of js/fonts.js)
+    const sel = document.getElementById('font');
+    if (window.QATT_FONTS) for (const o of [...sel.querySelectorAll('option')]) if (!QATT_FONTS.find(f => f.family === o.value && f.cjk)) o.remove();
+    update();
+    document.fonts.ready.then(layoutAll);
+    document.fonts.addEventListener?.('loadingdone', () => layoutAll());
+});
+</script>
+</body>
+</html>
