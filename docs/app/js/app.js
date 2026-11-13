@@ -479,9 +479,9 @@ window.notesApp = { store, ready, flush() } is for the tests.
 
   // The width of the pages is fixed with the document (format.width, in characters of the text: the width of the screen where it was made, at most
   // 46rem, at 100% = 32 px), so that zooming never breaks the lines or columns differently. On a narrower screen the document is shown smaller until
-  // it fits, a phone document on a wider one larger up to the width of a desktop document (twice at most): that is 100% there. The zoom (the slider) is a setting of this device for this document (localStorage), not part of the document.
-  const BASE = 32, ZOOM_KEY = 'nomNotesZoom';
-  const zooms = () => { try { return JSON.parse(localStorage.getItem(ZOOM_KEY)) || {}; } catch (e) { return {}; } };
+  // it fits, a phone document on a wider one larger up to the width of a desktop document (twice at most): that is 100% there. The zoom (the slider) is not kept: every document opens at 100%.
+  const BASE = 32;
+  try { localStorage.removeItem('nomNotesZoom'); } catch (e) { /* nothing kept */ }   // the zooms an earlier version kept
   const room = () => { const f = $('field'), cs = getComputedStyle(f); return Math.max(160, f.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight)); };
   const pageWidth = () => Math.round(Math.min(room(), 736) / BASE * 10) / 10;   // in characters of 32 px
   let zoom = 100;
@@ -497,7 +497,6 @@ window.notesApp = { store, ready, flush() } is for the tests.
   const setSize = (value, user) => {
     zoom = Math.min(300, Math.max(50, Math.round((Number(value) || 100) / 25) * 25));   // in steps of 25%
     $('set-size').value = $('read-zoom').value = zoom; $('size-label').textContent = $('size-btn-label').textContent = zoom + '%';
-    if (user && state.current) { const z = zooms(); if (zoom === 100) delete z[state.current.id]; else z[state.current.id] = zoom; try { localStorage.setItem(ZOOM_KEY, JSON.stringify(z)); } catch (e) { /* not kept */ } }
     // the middle of what is seen stays where it is (a page wider than the screen scrolls sideways); a vertical page begins at its right edge
     const f = $('field'), cx = user && f.scrollWidth > f.clientWidth ? (f.scrollLeft + f.clientWidth / 2) / f.scrollWidth : null;
     const cy = user ? (f.scrollTop + f.clientHeight / 2) / Math.max(1, f.scrollHeight) : null;
@@ -534,7 +533,7 @@ window.notesApp = { store, ready, flush() } is for the tests.
   function applyFormat(doc) {
     const f = formatOf(doc);
     fixWidth(doc);
-    setFont(f.font); setSize(zooms()[doc.id] || 100); useDecoding(f.decoding);
+    setFont(f.font); setSize(100); useDecoding(f.decoding);
   }
 
   // ----- delete and undo -----
