@@ -45,6 +45,7 @@
         .wari { color: #6b4b2a; }
         .seg {
             display: inline-block;
+            box-sizing: content-box;              /* Bootstrap sets border-box: the padding that completes a cell must come on top of the text */
             font-size: .5em;
             line-height: 1;
             block-size: 2em;
@@ -168,9 +169,13 @@ function layoutWari(w, el, v, len, pitch) {
     const box = el.getBoundingClientRect(), r = mk.getBoundingClientRect();
     let offset = v ? (r.top - box.top) % pitch : (r.left - box.left);
     if (offset < 0) offset = 0;
-    const fit = px => Math.floor((px + half * 0.05) / half);    // characters of half size in px (a little tolerance for rounding)
-    let perLine = fit(len - offset);
-    if (perLine < 1) perLine = fit(len);                         // no room left: the first segment starts the next column
+    const cell = 2 * half, tol = half * 0.05;                     // a cell of the grid = one character of the main text
+    // the grid of the old prints: two-column text takes whole cells. If it starts off the grid (after Latin text, say), it moves to the next cell boundary
+    let startPad = Math.ceil((offset - tol) / cell) * cell - offset;
+    if (startPad < tol) startPad = 0;
+    const fit = px => Math.floor((px + tol) / half);             // characters of half size in px (a little tolerance for rounding)
+    let perLine = fit(len - offset - startPad);
+    if (perLine < 1) { perLine = fit(len); startPad = 0; }        // no room left: the first segment starts the next column
     const full = fit(len);
     const segs = [];
     let i = 0, cap = 2 * perLine;
@@ -178,7 +183,10 @@ function layoutWari(w, el, v, len, pitch) {
         const take = Math.min(cap, chars.length - i);
         const s = document.createElement('span');
         s.className = 'seg';
-        s.style.inlineSize = Math.ceil(take / 2) + 'em';
+        const line = Math.ceil(take / 2);                         // balanced: the right line gets the extra character
+        s.style.inlineSize = line + 'em';
+        if (line % 2) s.style.paddingInlineEnd = '1em';           // half a cell left over: it stays empty, the main text goes on at the next cell
+        if (!segs.length && startPad) s.style.marginInlineStart = startPad + 'px';
         s.textContent = chars.slice(i, i + take).join('');
         segs.push(s);
         i += take;
