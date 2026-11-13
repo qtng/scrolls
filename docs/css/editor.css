@@ -34,6 +34,7 @@
    writing mode: its columns stack downwards). editor.js sets the height to whole bands. */
 .ProseMirror .sec.v {
     writing-mode: vertical-rl;
+    text-orientation: upright;    /* Latin letters stand upright, one under the other */
     line-height: 1.6;
     width: 100%;
     column-width: calc(var(--cols) * 1em);
