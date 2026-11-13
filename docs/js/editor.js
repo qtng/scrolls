@@ -132,29 +132,61 @@ function insertSection(view, dir) {
 // ---------------------------------------------------------------- two-column text and bands: the layout
 const layoutKey = new PluginKey('layout');
 
-// The segments of a run of two-column text (chars: code points). The grid of the old prints: it takes whole cells; the first segment fills
-// the rest of the column, the next ones whole columns, the last one is balanced (the right line gets the extra character); half a cell left over stays empty.
-// from/to are offsets in UTF-16 units from the start of the run.
-function segments(chars, offset, len, half) {
+// The advance of every character at the size of the two-column text, measured on a canvas: Latin letters are narrower than a cell
+// (and lie on their side in a vertical section), so the lines cannot be counted in characters.
+const measure = {
+    ctx: null, cache: new Map(),
+    widths(chars, cs, half) {
+        const font = `${cs.fontStyle} ${cs.fontWeight} ${half}px ${cs.fontFamily}`;
+        this.ctx ||= document.createElement('canvas').getContext('2d');
+        this.ctx.font = font;
+        return chars.map(c => {
+            const key = font + '\n' + c;
+            let w = this.cache.get(key);
+            if (w === undefined) { w = this.ctx.measureText(c).width; this.cache.set(key, w); }
+            return w;
+        });
+    },
+};
+
+// The segments of a run of two-column text (chars: code points, widths: their advances in px). The grid of the old prints: a segment takes
+// whole cells; the first one fills the rest of the column, the next ones whole columns, the last one is balanced (the first line is the
+// longer one); what is left of its last cell stays empty. from/to are offsets in UTF-16 units from the start of the run.
+function segments(chars, widths, offset, len, half) {
     const cell = 2 * half, tol = half * 0.05;
     let startPad = Math.ceil((offset - tol) / cell) * cell - offset;
     if (startPad < tol) startPad = 0;
-    const fit = px => Math.floor((px + tol) / half);
-    let perLine = fit(len - offset - startPad);
-    if (perLine < 1) { perLine = fit(len); startPad = 0; }
-    const full = Math.max(1, fit(len));
+    const cells = px => Math.floor((px + tol) / cell) * cell;
+    const full = Math.max(cell, cells(len));
+    let cap = cells(len - offset - startPad);
+    if (cap < cell) { cap = full; startPad = 0; }
+    const em = px => (px / half).toFixed(3) + 'em';
     const out = [];
-    let i = 0, u = 0, cap = 2 * Math.max(1, perLine);
+    let i = 0, u = 0;
     while (i < chars.length) {
-        const take = Math.min(cap, chars.length - i);
-        const units = chars.slice(i, i + take).join('').length;
-        const line = Math.ceil(take / 2);
-        let style = `inline-size: ${line}em;`;
-        if (line % 2) style += ' padding-inline-end: 1em;';
+        // two lines of at most cap, filled as the browser fills them
+        let j = i, lines = 0;
+        while (lines < 2 && j < chars.length) {
+            let sum = 0, k = j;
+            while (k < chars.length && (k === j || sum + widths[k] <= cap + tol)) sum += widths[k++];
+            j = k; lines++;
+        }
+        let style;
+        if (j < chars.length) style = `inline-size: ${em(cap)};`;
+        else {
+            // the last segment: the shortest first line that leaves no more for the second one
+            let total = 0, first = 0, k = i;
+            for (let x = i; x < j; x++) total += widths[x];
+            while (k < j && first < total / 2 - tol) first += widths[k++];
+            const size = Math.min(cap, first + 0.5), whole = Math.max(cell, Math.ceil((first - tol) / cell) * cell);
+            style = `inline-size: ${em(size)};`;
+            if (whole - size > tol) style += ` padding-inline-end: ${em(whole - size)};`;
+        }
         if (!out.length && startPad) style += ` margin-inline-start: ${startPad.toFixed(2)}px;`;
+        const units = chars.slice(i, j).join('').length;
         out.push({ from: u, to: u + units, style });
-        i += take; u += units;
-        cap = 2 * full;
+        i = j; u += units;
+        cap = full;
     }
     return out;
 }
@@ -239,11 +271,12 @@ class Layout {
             runs.forEach((run, k) => {
                 const mk = mks[k], sec = mk.closest('section.sec'), inf = info.get(sec);
                 if (!inf) return;
-                const half = parseFloat(getComputedStyle(mk.parentElement).fontSize) / 2;   // a character of the two-column text
+                const pcs = getComputedStyle(mk.parentElement), half = parseFloat(pcs.fontSize) / 2;   // a character of the two-column text
+                const chars = [...run.text];
                 const box = sec.getBoundingClientRect(), r = mk.getBoundingClientRect();
                 let offset = inf.v ? (r.top - box.top) % inf.pitch : (r.left - box.left);
                 if (offset < 0) offset = 0;
-                for (const s of segments([...run.text], offset, inf.len, half)) {
+                for (const s of segments(chars, measure.widths(chars, pcs, half), offset, inf.len, half)) {
                     const from = run.from + s.from, to = run.from + s.to;
                     decos.push(Decoration.inline(from, to, { class: 'seg', style: s.style }, { style: s.style }));
                     sig.push(`${from}:${to}:${s.style}`);
