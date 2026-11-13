@@ -392,11 +392,25 @@ const UI = {
         this.tools = el('div', { className: 'scroll-ui', hidden: true }, this.bH, this.bV, this.colsBox, el('span', { className: 'sep' }), this.bDel);
 
         document.body.append(this.bubble, this.plus, this.plusMenu, this.tools);
+        if (window.visualViewport) for (const ev of ['resize', 'scroll']) visualViewport.addEventListener(ev, () => this.refresh());
         document.addEventListener('pointerdown', e => {
             if (this.menuOpen && !this.plusMenu.contains(e.target) && !this.plus.contains(e.target)) { this.menuOpen = false; this.refresh(); }
         });
     },
+    // a touch screen: the system menu (Translate, Cut, Copy) and the selection handles sit over and under the selection, so the menus of the
+    // editor are docked at the bottom of the visible area (above the keyboard) instead
+    coarse: matchMedia('(pointer: coarse)').matches,
+    dock(box) {
+        const vv = window.visualViewport, w = box.offsetWidth, h = box.offsetHeight;
+        const vw = vv ? vv.width : innerWidth, vh = vv ? vv.height : innerHeight, ox = vv ? vv.offsetLeft : 0, oy = vv ? vv.offsetTop : 0;
+        box.classList.add('docked');
+        box.style.left = Math.max(ox + 8, ox + (vw - w) / 2) + 'px';
+        // above the bottom bar of the site (phone), if it is shown (it hides itself while the keyboard is open)
+        const bar = document.querySelector('.bottom-bar'), barTop = bar && getComputedStyle(bar).display !== 'none' ? bar.getBoundingClientRect().top : Infinity;
+        box.style.top = Math.max(oy + 8, Math.min(oy + vh, barTop) - h - 10) + 'px';
+    },
     place(box, left, top) {
+        if (this.coarse && box !== this.plus && box !== this.plusMenu) return this.dock(box);
         const w = box.offsetWidth, vw = document.documentElement.clientWidth;
         box.style.left = Math.max(8, Math.min(left, vw - w - 8)) + scrollX + 'px';
         box.style.top = Math.max(8, top) + scrollY + 'px';
