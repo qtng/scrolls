@@ -241,3 +241,9 @@ input.doc-title:focus { border-color: var(--accent); }
 /* the title: a dotted line below it, like the lines between the pages; a tap sets it only while editing */
 #view-editor .doc-head { padding-bottom: calc(var(--unit, 32px) * .25); border-bottom: 1px dotted color-mix(in srgb, var(--field-ink, var(--ink)) 35%, transparent); margin-bottom: calc(var(--unit, 32px) * .5); }
 #view-editor.reading .doc-title { cursor: default; }
+
+/* a document is shown when its fonts and its layout are ready (app.js reveal) */
+.field.loading { position: relative; }
+.field.loading .doc-head, .field.loading #editor { visibility: hidden; }
+.field.loading::after { content: ''; position: absolute; left: 50%; top: 30%; width: 28px; height: 28px; margin-left: -14px; border: 3px solid color-mix(in srgb, var(--field-ink, var(--ink)) 25%, transparent); border-top-color: var(--field-ink, var(--ink)); border-radius: 50%; animation: nn-spin .8s linear infinite; }
+@keyframes nn-spin { to { transform: rotate(360deg); } }

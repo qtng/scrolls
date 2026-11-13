@@ -449,6 +449,7 @@ class Layout {
             document.fonts.addEventListener('loading', () => document.fonts.ready.then(this.again));
         }
         this.retries = 0;
+        this.waiters = [];   // NomEditor.settled(): resolved when a run has nothing more to move
         // and when the number of loaded font files changes (some browsers send no event at all then)
         const loaded = () => { let n = 0; if (document.fonts) for (const f of document.fonts) if (f.status === 'loaded') n++; return n; };
         this.loaded = loaded();
@@ -542,6 +543,7 @@ class Layout {
             if (rt.style.getPropertyValue('--rs') !== scale) rt.style.setProperty('--rs', scale);
         }
         UI.refresh();
+        const w = this.waiters; this.waiters = []; w.forEach(f => f());
     }
 }
 
@@ -977,6 +979,8 @@ const NomEditor = {
     canRedo: () => redo(view.state),
     setTelex(on) { if (ime) ime.update({ telex: !!on, candidates: false }); if (RubyBox.ime) RubyBox.ime.update({ telex: !!on, candidates: false }); },
     relayout() { measure.cache.clear(); if (Layout.current) Layout.current.schedule(true); },
+    // a promise: the layout is done (the two-column text set, the bands cut)
+    settled() { return new Promise(res => { if (!Layout.current) return res(); Layout.current.waiters.push(res); Layout.current.schedule(true); }); },
     // the rhyme table of the document (parser.js): the readings of the ruby in QATT
     setDecoding(name) { Scripts.decoding = name; if (Scripts.parser) Scripts.parser.setDecoding(name); },
     get view() { return view; },
