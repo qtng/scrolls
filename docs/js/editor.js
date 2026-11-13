@@ -30,7 +30,7 @@ const schema = new Schema({
             isolating: true,
             attrs: { dir: { default: 'v' }, cols: { default: DEFAULT_COLS } },
             parseDOM: [{ tag: 'section.sec', getAttrs: d => ({ dir: d.dataset.dir === 'h' ? 'h' : 'v', cols: clampCols(+d.dataset.cols) }) }],
-            toDOM: n => ['section', { class: 'sec ' + n.attrs.dir, 'data-dir': n.attrs.dir, 'data-cols': n.attrs.cols, style: `--cols: ${n.attrs.cols}` }, 0],
+            toDOM: n => ['section', { class: 'sec shadow ' + n.attrs.dir, 'data-dir': n.attrs.dir, 'data-cols': n.attrs.cols, style: `--cols: ${n.attrs.cols}` }, 0],
         },
         paragraph: { group: 'block', content: 'inline*', parseDOM: [{ tag: 'p' }], toDOM: () => ['p', 0] },
         heading: {
@@ -62,7 +62,7 @@ class SectionView {
     set(node) {
         const d = this.dom, a = node.attrs;
         if (!this.node || this.node.attrs.dir !== a.dir) d.style.height = '';
-        d.className = 'sec ' + a.dir;
+        d.className = 'sec shadow ' + a.dir;
         d.dataset.dir = a.dir;
         d.dataset.cols = a.cols;
         d.style.setProperty('--cols', a.cols);
