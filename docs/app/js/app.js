@@ -495,7 +495,7 @@ window.notesApp = { store, ready, flush() } is for the tests.
     NomEditor.relayout();
   }
   const setSize = (value, user) => {
-    zoom = Math.min(300, Math.max(50, Number(value) || 100));
+    zoom = Math.min(300, Math.max(50, Math.round((Number(value) || 100) / 25) * 25));   // in steps of 25%
     $('set-size').value = $('read-zoom').value = zoom; $('size-label').textContent = $('size-btn-label').textContent = zoom + '%';
     if (user && state.current) { const z = zooms(); if (zoom === 100) delete z[state.current.id]; else z[state.current.id] = zoom; try { localStorage.setItem(ZOOM_KEY, JSON.stringify(z)); } catch (e) { /* not kept */ } }
     // the middle of what is seen stays where it is (a page wider than the screen scrolls sideways); a vertical page begins at its right edge
