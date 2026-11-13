@@ -9,7 +9,7 @@
     <link href="https://qatt.org/vendor/bootstrap/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://qatt.org/css/site.css">
     <link rel="stylesheet" href="/scrolls/css/scrolls.css">
-    <link rel="stylesheet" href="https://qatt.org/vendor/bootstrap-icons/bootstrap-icons.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 
     <script src="https://qatt.org/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
     <script src="https://qatt.org/vendor/supabase/supabase.min.js"></script>
@@ -49,7 +49,7 @@
             <div class="han mb-2">卷</div>
             <h1 class="mb-3" data-vi="Cuốn">Scrolls</h1>
             <p class="lead mx-auto mb-4">Write documents in the style of old Asian texts, horizontal or vertical.</p>
-            <button type="button" class="btn btn-cinnabar btn-pill" id="new-scroll"><i class="bi bi-plus-lg me-1"></i> <span data-vi="Cuốn mới">New scroll</span></button>
+            <button type="button" class="btn btn-cinnabar btn-pill" id="new-scroll"><i class="fa-solid fa-plus me-1"></i> <span data-vi="Cuốn mới">New scroll</span></button>
         </div>
     </header>
 
@@ -113,7 +113,7 @@
                 top.addEventListener('click', open);
                 const icon = document.createElement('span');
                 icon.className = 'scroll-icon';
-                icon.innerHTML = '<i class="bi bi-file-text"></i>';
+                icon.innerHTML = '<i class="fa-solid fa-file-lines"></i>';
                 const text = document.createElement('div');
                 text.className = 'flex-grow-1';
                 const title = document.createElement('div');
@@ -130,7 +130,7 @@
                 del.className = 'btn btn-sm btn-link text-secondary text-decoration-none';
                 del.setAttribute('aria-label', 'Delete');
                 del.setAttribute('data-vi-aria-label', 'Xóa');
-                del.innerHTML = '<i class="bi bi-trash"></i>';
+                del.innerHTML = '<i class="fa-solid fa-trash"></i>';
                 del.addEventListener('click', async e => {
                     e.stopPropagation();
                     const name = s.title || (window.Lang ? Lang.t('Untitled', 'Chưa đặt tên') : 'Untitled');

@@ -358,26 +358,27 @@ const UI = {
             b.addEventListener('click', () => { if (!this.view) return; run(); if (!RubyBox.isOpen()) this.view.focus(); });
             return b;
         };
-        const icon = c => el('i', { className: 'bi ' + c });
+        const icon = c => el('i', { className: 'fa-solid ' + c });
+        const hIcon = n => el('span', { className: 'h-icon' }, icon('fa-heading'), el('sub', {}, String(n)));
         const sep = () => el('span', { className: 'sep' });
         const cmd = c => () => c(this.view.state, this.view.dispatch, this.view);
 
-        this.bH1 = btn(icon('bi-type-h1'), 'Heading', 'Tiêu đề', cmd(setHeading(1)));
-        this.bH2 = btn(icon('bi-type-h2'), 'Subheading', 'Tiêu đề phụ', cmd(setHeading(2)));
-        this.bWari = btn(icon('bi-layout-split'), 'Two-column text', 'Chữ hai dòng', cmd(toggleWari));
-        this.bRuby = btn(icon('bi-superscript'), 'Ruby (reading)', 'Chú âm', () => RubyBox.open());
-        this.bH = btn(icon('bi-text-paragraph'), 'Horizontal section', 'Phần ngang', () => this.setSection({ dir: 'h' }));
-        this.bV = btn(icon('bi-layout-three-columns'), 'Vertical section', 'Phần dọc', () => this.setSection({ dir: 'v' }));
-        this.bLess = btn(icon('bi-dash'), 'Fewer characters per column', 'Ít chữ hơn mỗi cột', () => this.setSection({ step: -1 }));
+        this.bH1 = btn(hIcon(1), 'Heading', 'Tiêu đề', cmd(setHeading(1)));
+        this.bH2 = btn(hIcon(2), 'Subheading', 'Tiêu đề phụ', cmd(setHeading(2)));
+        this.bWari = btn(icon('fa-table-columns'), 'Two-column text', 'Chữ hai dòng', cmd(toggleWari));
+        this.bRuby = btn(icon('fa-superscript'), 'Ruby (reading)', 'Chú âm', () => RubyBox.open());
+        this.bH = btn(icon('fa-grip-lines'), 'Horizontal section', 'Phần ngang', () => this.setSection({ dir: 'h' }));
+        this.bV = btn(icon('fa-grip-lines-vertical'), 'Vertical section', 'Phần dọc', () => this.setSection({ dir: 'v' }));
+        this.bLess = btn(icon('fa-minus'), 'Fewer characters per column', 'Ít chữ hơn mỗi cột', () => this.setSection({ step: -1 }));
         this.colsNum = el('span', { className: 'num' });
         titled(this.colsNum, 'Characters per column', 'Số chữ mỗi cột');
-        this.bMore = btn(icon('bi-plus'), 'More characters per column', 'Nhiều chữ hơn mỗi cột', () => this.setSection({ step: 1 }));
-        this.bDel = btn(icon('bi-trash'), 'Delete section', 'Xóa phần', () => this.deleteSection());
+        this.bMore = btn(icon('fa-plus'), 'More characters per column', 'Nhiều chữ hơn mỗi cột', () => this.setSection({ step: 1 }));
+        this.bDel = btn(icon('fa-trash'), 'Delete section', 'Xóa phần', () => this.deleteSection());
         this.bar.append(this.bH1, this.bH2, this.bWari, this.bRuby, sep(), this.bH, this.bV, this.bLess, this.colsNum, this.bMore, sep(), this.bDel);
 
         // the plus on an empty line (floating, as on Medium): a new section there
         this.plus = el('button', { type: 'button', className: 'scroll-plus', hidden: true });
-        this.plus.append(icon('bi-plus-lg'));
+        this.plus.append(icon('fa-plus'));
         titled(this.plus, 'New section', 'Phần mới');
         this.plus.addEventListener('mousedown', e => e.preventDefault());
         this.plus.addEventListener('click', () => { this.menuOpen = !this.menuOpen; this.refresh(); });
@@ -387,7 +388,7 @@ const UI = {
             return b;
         };
         this.plusMenu = el('div', { className: 'scroll-ui scroll-plus-menu', hidden: true },
-            item('bi-text-paragraph', 'Horizontal section', 'Phần ngang', 'h'), item('bi-layout-three-columns', 'Vertical section', 'Phần dọc', 'v'));
+            item('fa-grip-lines', 'Horizontal section', 'Phần ngang', 'h'), item('fa-grip-lines-vertical', 'Vertical section', 'Phần dọc', 'v'));
         document.body.append(this.plus, this.plusMenu);
         document.addEventListener('pointerdown', e => {
             if (this.menuOpen && !this.plusMenu.contains(e.target) && !this.plus.contains(e.target)) { this.menuOpen = false; this.refresh(); }
@@ -494,8 +495,8 @@ const RubyBox = {
             else if (e.key === 'Escape' && !(this.ime && this.ime.visible)) { e.preventDefault(); this.close(true); }
         });
         this.input.addEventListener('input', () => this.preview());
-        this.ok = btn(el('i', { className: 'bi bi-check-lg' }), 'Apply', 'Áp dụng', () => this.apply(this.input.value));
-        this.del = btn(el('i', { className: 'bi bi-trash' }), 'Remove the ruby', 'Bỏ chú âm', () => this.apply(''));
+        this.ok = btn(el('i', { className: 'fa-solid fa-check' }), 'Apply', 'Áp dụng', () => this.apply(this.input.value));
+        this.del = btn(el('i', { className: 'fa-solid fa-trash' }), 'Remove the ruby', 'Bỏ chú âm', () => this.apply(''));
         this.shown = el('span', { className: 'rt-preview' });
         this.sugg = el('div', { className: 'rt-sugg' });
         this.kindBtns = Scripts.KINDS.map(([k, label]) => {
@@ -505,7 +506,7 @@ const RubyBox = {
         });
         this.overBtn = btn(el('i', { className: 'bi' }), 'Over (vertical: right)', 'Trên (dọc: bên phải)', () => this.setSide('over'));
         this.underBtn = btn(el('i', { className: 'bi' }), 'Under (vertical: left)', 'Dưới (dọc: bên trái)', () => this.setSide('under'));
-        this.eachBtn = btn(el('i', { className: 'bi bi-magic' }), 'Each character its reading from the dictionary', 'Từng chữ theo từ điển', () => this.eachChar());
+        this.eachBtn = btn(el('i', { className: 'fa-solid fa-wand-magic-sparkles' }), 'Each character its reading from the dictionary', 'Từng chữ theo từ điển', () => this.eachChar());
         this.box = el('div', { className: 'scroll-ui ruby-box', hidden: true },
             el('div', { className: 'rt-row' }, this.input, this.ok, this.del),
             el('div', { className: 'rt-row' }, this.shown),
@@ -571,8 +572,8 @@ const RubyBox = {
     },
     markSide() {
         const vert = this.view.state.doc.resolve(this.range ? this.range.from : 0).node(1)?.attrs.dir === 'v';
-        this.overBtn.firstChild.className = 'bi ' + (vert ? 'bi-arrow-right' : 'bi-arrow-up');
-        this.underBtn.firstChild.className = 'bi ' + (vert ? 'bi-arrow-left' : 'bi-arrow-down');
+        this.overBtn.firstChild.className = 'fa-solid ' + (vert ? 'fa-arrow-right' : 'fa-arrow-up');
+        this.underBtn.firstChild.className = 'fa-solid ' + (vert ? 'fa-arrow-left' : 'fa-arrow-down');
         this.overBtn.classList.toggle('on', this.side === 'over');
         this.underBtn.classList.toggle('on', this.side === 'under');
     },
