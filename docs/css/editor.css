@@ -15,13 +15,16 @@
 .page { max-width: 46rem; margin: 0 auto; padding: 2.5rem 1rem 40vh; }
 .message { text-align: center; color: var(--bs-secondary-color); padding: 3rem 1rem; }
 
+/* the page is beige, the sections are paper */
+body { background: var(--paper-2); }
+
 /* the text */
 #editor .ProseMirror {
     outline: none;
     font-family: var(--doc-font, var(--font-cjk)), var(--font-cjk), serif;
     font-size: var(--doc-size, 22px);
 }
-.ProseMirror .sec { margin: 0 0 3rem; position: relative; }
+.ProseMirror .sec { margin: 0 0 3rem; position: relative; background: var(--paper); }
 .ProseMirror p, .ProseMirror h1, .ProseMirror h2 { margin: 0; font-weight: normal; font-family: inherit; }
 .ProseMirror h1 { font-size: 1.6em; }
 .ProseMirror h2 { font-size: 1.25em; }
@@ -34,6 +37,7 @@
    writing mode: its columns stack downwards). editor.js sets the height to whole bands. */
 .ProseMirror .sec.v {
     writing-mode: vertical-rl;
+    text-orientation: upright;    /* Latin letters stand upright, one under the other */
     line-height: 1.6;
     width: 100%;
     column-width: calc(var(--cols) * 1em);

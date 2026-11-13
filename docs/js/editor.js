@@ -30,7 +30,7 @@ const schema = new Schema({
             isolating: true,
             attrs: { dir: { default: 'v' }, cols: { default: DEFAULT_COLS } },
             parseDOM: [{ tag: 'section.sec', getAttrs: d => ({ dir: d.dataset.dir === 'h' ? 'h' : 'v', cols: clampCols(+d.dataset.cols) }) }],
-            toDOM: n => ['section', { class: 'sec shadow ' + n.attrs.dir, 'data-dir': n.attrs.dir, 'data-cols': n.attrs.cols, style: `--cols: ${n.attrs.cols}` }, 0],
+            toDOM: n => ['section', { class: 'sec shadow p-3 ' + n.attrs.dir, 'data-dir': n.attrs.dir, 'data-cols': n.attrs.cols, style: `--cols: ${n.attrs.cols}` }, 0],
         },
         paragraph: { group: 'block', content: 'inline*', parseDOM: [{ tag: 'p' }], toDOM: () => ['p', 0] },
         heading: {
@@ -62,7 +62,7 @@ class SectionView {
     set(node) {
         const d = this.dom, a = node.attrs;
         if (!this.node || this.node.attrs.dir !== a.dir) d.style.height = '';
-        d.className = 'sec shadow ' + a.dir;
+        d.className = 'sec shadow p-3 ' + a.dir;
         d.dataset.dir = a.dir;
         d.dataset.cols = a.cols;
         d.style.setProperty('--cols', a.cols);
@@ -132,20 +132,32 @@ function insertSection(view, dir) {
 // ---------------------------------------------------------------- two-column text and bands: the layout
 const layoutKey = new PluginKey('layout');
 
-// The advance of every character at the size of the two-column text, measured on a canvas: Latin letters are narrower than a cell
-// (and lie on their side in a vertical section), so the lines cannot be counted in characters.
+// The advance of every character at the size of the two-column text: Latin letters are not as long as a cell, so the lines cannot be counted
+// in characters.
 const measure = {
-    ctx: null, cache: new Map(),
-    widths(chars, cs, half) {
-        const font = `${cs.fontStyle} ${cs.fontWeight} ${half}px ${cs.fontFamily}`;
-        this.ctx ||= document.createElement('canvas').getContext('2d');
-        this.ctx.font = font;
-        return chars.map(c => {
-            const key = font + '\n' + c;
-            let w = this.cache.get(key);
-            if (w === undefined) { w = this.ctx.measureText(c).width; this.cache.set(key, w); }
-            return w;
-        });
+    cache: new Map(), probe: null,
+    // the advance of every character along the line, measured in the DOM as it is set (in a vertical section upright: Latin letters
+    // then take their vertical advance, which a canvas cannot measure)
+    widths(chars, cs, half, vertical) {
+        const font = `${cs.fontStyle} ${cs.fontWeight} ${half}px ${cs.fontFamily}`, orient = vertical ? 'v' : 'h';
+        const keyOf = c => orient + font + '\n' + c;
+        const missing = [...new Set(chars.filter(c => !this.cache.has(keyOf(c))))];
+        if (missing.length) {
+            if (!this.probe) {
+                this.probe = el('div', { ariaHidden: 'true' });
+                this.probe.style.cssText = 'position:absolute;left:-9999px;top:0;visibility:hidden;white-space:pre;line-height:1;';
+                document.body.append(this.probe);
+            }
+            const pr = this.probe;
+            pr.style.font = font;
+            pr.style.writingMode = vertical ? 'vertical-rl' : 'horizontal-tb';
+            pr.style.textOrientation = vertical ? 'upright' : 'mixed';
+            const spans = missing.map(c => el('span', { textContent: c }));
+            pr.replaceChildren(...spans);
+            spans.forEach((sp, k) => { const r = sp.getBoundingClientRect(); this.cache.set(keyOf(missing[k]), vertical ? r.height : r.width); });
+            pr.replaceChildren();
+        }
+        return chars.map(c => this.cache.get(keyOf(c)));
     },
 };
 
@@ -243,7 +255,7 @@ class Layout {
         this.passes = 0;
         this.onResize = () => this.schedule(true);
         window.addEventListener('resize', this.onResize);
-        document.fonts?.addEventListener?.('loadingdone', this.onResize);
+        document.fonts?.addEventListener?.('loadingdone', () => { measure.cache.clear(); this.schedule(true); });   // measured again in the loaded font
         view.dom.addEventListener('compositionend', () => this.schedule(true));
         Layout.current = this;
         this.schedule(true);
@@ -261,9 +273,11 @@ class Layout {
         for (const sec of sections) {
             const v = sec.dataset.dir === 'v', cs = getComputedStyle(sec), em = parseFloat(cs.fontSize);
             const gap = v ? parseFloat(cs.columnGap) || 0 : 0;
-            const len = v ? (+sec.dataset.cols || DEFAULT_COLS) * em : sec.clientWidth;
-            info.set(sec, { v, gap, len, pitch: len + gap });
-            if (v) sec.style.height = (200 * (len + gap)) + 'px';   // generous first, cut to whole bands below
+            const pad = { t: parseFloat(cs.paddingTop) + parseFloat(cs.borderTopWidth), b: parseFloat(cs.paddingBottom) + parseFloat(cs.borderBottomWidth),
+                l: parseFloat(cs.paddingLeft) + parseFloat(cs.borderLeftWidth), r: parseFloat(cs.paddingRight) + parseFloat(cs.borderRightWidth) };
+            const len = v ? (+sec.dataset.cols || DEFAULT_COLS) * em : sec.offsetWidth - pad.l - pad.r;
+            info.set(sec, { v, gap, len, pad, pitch: len + gap });
+            if (v) sec.style.height = (200 * (len + gap) + pad.t + pad.b) + 'px';   // generous first, cut to whole bands below
         }
         const runs = wariRuns(view.state.doc), mks = view.dom.querySelectorAll('i.mk');
         const decos = [], sig = [];
@@ -274,9 +288,9 @@ class Layout {
                 const pcs = getComputedStyle(mk.parentElement), half = parseFloat(pcs.fontSize) / 2;   // a character of the two-column text
                 const chars = [...run.text];
                 const box = sec.getBoundingClientRect(), r = mk.getBoundingClientRect();
-                let offset = inf.v ? (r.top - box.top) % inf.pitch : (r.left - box.left);
+                let offset = inf.v ? (r.top - box.top - inf.pad.t) % inf.pitch : (r.left - box.left - inf.pad.l);
                 if (offset < 0) offset = 0;
-                for (const s of segments(chars, measure.widths(chars, pcs, half), offset, inf.len, half)) {
+                for (const s of segments(chars, measure.widths(chars, pcs, half, inf.v), offset, inf.len, half)) {
                     const from = run.from + s.from, to = run.from + s.to;
                     decos.push(Decoration.inline(from, to, { class: 'seg', style: s.style }, { style: s.style }));
                     sig.push(`${from}:${to}:${s.style}`);
@@ -294,12 +308,12 @@ class Layout {
         for (const sec of sections) {
             const inf = info.get(sec);
             if (!inf.v) continue;
-            const top = sec.getBoundingClientRect().top, range = document.createRange();
+            const top = sec.getBoundingClientRect().top + inf.pad.t, range = document.createRange();
             range.selectNodeContents(sec);
             let bottom = top;
             for (const rc of range.getClientRects()) if (rc.width || rc.height) bottom = Math.max(bottom, rc.bottom);
             const bands = Math.max(1, Math.floor((bottom - top - 1) / inf.pitch) + 1);
-            sec.style.height = (bands * inf.pitch - inf.gap) + 'px';
+            sec.style.height = (bands * inf.pitch - inf.gap + inf.pad.t + inf.pad.b) + 'px';
         }
         // ruby longer than its base is narrowed (the base keeps its cell)
         for (const rb of view.dom.querySelectorAll('.rb')) {
@@ -456,7 +470,7 @@ const UI = {
             b.append(vi(en, viText));
             return b;
         };
-        this.plusMenu = el('div', { className: 'scroll-ui scroll-plus-menu', hidden: true },
+        this.plusMenu = el('div', { className: 'scroll-ui scroll-plus-menu bg-light', hidden: true },
             item('fa-grip-lines', 'Horizontal section', 'Phần ngang', 'h'), item('fa-grip-lines-vertical', 'Vertical section', 'Phần dọc', 'v'));
         document.body.append(this.plus, this.plusMenu);
         document.addEventListener('pointerdown', e => {
@@ -583,7 +597,7 @@ const RubyBox = {
         });
         this.overBtn = btn(el('i', { className: 'bi' }), 'Over (vertical: right)', 'Trên (dọc: bên phải)', () => this.setSide('over'));
         this.underBtn = btn(el('i', { className: 'bi' }), 'Under (vertical: left)', 'Dưới (dọc: bên trái)', () => this.setSide('under'));
-        this.box = el('div', { className: 'scroll-ui ruby-box', hidden: true },
+        this.box = el('div', { className: 'scroll-ui ruby-box bg-light', hidden: true },
             el('div', { className: 'rt-row' }, this.input, this.ok, this.del),
             el('div', { className: 'rt-row' }, this.shown),
             el('div', { className: 'rt-row' }, ...this.kindBtns, el('span', { className: 'sep' }), this.overBtn, this.underBtn, el('span', { className: 'sep' }), this.eachBtn));
@@ -891,12 +905,12 @@ async function start() {
     fontSel.addEventListener('change', () => {
         if (store.settings.font !== fontSel.value) { store.settings.font = fontSel.value; store.changed(); }
         applySettings();
-        document.fonts.ready.then(() => Layout.current && Layout.current.schedule(true));
+        document.fonts.ready.then(() => { measure.cache.clear(); if (Layout.current) Layout.current.schedule(true); });
     });
     sizeSel.addEventListener('change', () => { store.settings.size = +sizeSel.value; applySettings(); store.changed(); Layout.current && Layout.current.schedule(true); });
     document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') store.save(); });
     window.addEventListener('beforeunload', e => { if (store.dirty || store.saving) { store.save(); e.preventDefault(); e.returnValue = ''; } });
-    document.fonts.ready.then(() => Layout.current && Layout.current.schedule(true));
+    document.fonts.ready.then(() => { measure.cache.clear(); if (Layout.current) Layout.current.schedule(true); });
     if (!doc || !doc.textContent) editor.focus();
 }
 
