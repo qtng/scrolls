@@ -25,17 +25,19 @@ body { background: var(--paper-2); }
     font-size: var(--doc-size, 22px);
 }
 .ProseMirror .sec { margin: 0 0 3rem; position: relative; background: var(--paper); }
+.ProseMirror .grp { position: relative; }
+.ProseMirror .grp + .grp { margin-top: 1.5rem; }   /* a change of direction */
 .ProseMirror p, .ProseMirror h1, .ProseMirror h2 { margin: 0; font-weight: normal; font-family: inherit; }
 .ProseMirror h1 { font-size: 1.6em; }
 .ProseMirror h2 { font-size: 1.25em; }
 
-/* horizontal section: plain flowing text */
-.ProseMirror .sec.h { line-height: 1.6; }
-.ProseMirror .sec.h h1, .ProseMirror .sec.h h2 { line-height: 1.4; margin-bottom: .3em; }
+/* a group of horizontal paragraphs: plain flowing text */
+.ProseMirror .grp.h { line-height: 1.6; }
+.ProseMirror .grp.h h1, .ProseMirror .grp.h h2 { line-height: 1.4; margin-bottom: .3em; }
 
-/* vertical section: columns of --cols characters, right to left; the next band below when the width is full (multicol in the vertical
+/* a group of vertical paragraphs: columns of --cols characters, right to left; the next band below when the width is full (multicol in the vertical
    writing mode: its columns stack downwards). editor.js sets the height to whole bands. */
-.ProseMirror .sec.v {
+.ProseMirror .grp.v {
     writing-mode: vertical-rl;
     text-orientation: upright;    /* Latin letters stand upright, one under the other */
     line-height: 1.6;
@@ -45,7 +47,7 @@ body { background: var(--paper-2); }
     column-fill: auto;
     column-rule: 1px solid var(--bs-border-color);
 }
-.ProseMirror .sec.v h1, .ProseMirror .sec.v h2 { margin-left: .3em; }
+.ProseMirror .grp.v h1, .ProseMirror .grp.v h2 { margin-left: .3em; }
 
 /* two-column text: segments set by editor.js (half size, two lines = one line of the main text, whole cells) */
 .ProseMirror .wari { color: color-mix(in srgb, currentColor 75%, var(--bs-body-bg)); }
@@ -59,7 +61,7 @@ body { background: var(--paper-2); }
     line-break: anywhere;
     word-break: break-all;
 }
-.ProseMirror .sec.v .seg { position: relative; left: -.05em; }   /* the optical centre of the column (about 1px at 40px) */
+.ProseMirror .grp.v .seg { position: relative; left: -.05em; }   /* the optical centre of the column (about 1px at 40px) */
 .ProseMirror .mk { display: inline-block; inline-size: 0; block-size: 1em; }
 
 /* the placeholder of an empty scroll */
@@ -81,10 +83,10 @@ body { background: var(--paper-2); }
    along the line when it is longer than the base (--rs) */
 .ProseMirror .rb { position: relative; }
 /* a block with ruby gets the room for it between its lines (columns) */
-.ProseMirror .sec p:has(.rb), .ProseMirror .sec h1:has(.rb), .ProseMirror .sec h2:has(.rb) { line-height: 2.2; }
+.ProseMirror .grp p:has(.rb), .ProseMirror .grp h1:has(.rb), .ProseMirror .grp h2:has(.rb) { line-height: 2.2; }
 .ProseMirror .rb .rt {
     position: absolute;
-    font-size: .42em;
+    font-size: .55em;
     line-height: 1;
     white-space: nowrap;
     pointer-events: none;
@@ -92,12 +94,12 @@ body { background: var(--paper-2); }
     color: color-mix(in srgb, currentColor 80%, var(--bs-body-bg));
     text-orientation: mixed;
 }
-.ProseMirror .sec.h .rb .rt { left: 50%; transform: translateX(-50%) scaleX(var(--rs, 1)); }
-.ProseMirror .sec.h .rb[data-side="over"] .rt { bottom: 100%; }
-.ProseMirror .sec.h .rb[data-side="under"] .rt { top: 100%; }
-.ProseMirror .sec.v .rb .rt { top: 50%; transform: translateY(-50%) scaleY(var(--rs, 1)); }
-.ProseMirror .sec.v .rb[data-side="over"] .rt { left: 100%; }
-.ProseMirror .sec.v .rb[data-side="under"] .rt { right: 100%; }
+.ProseMirror .grp.h .rb .rt { left: 50%; transform: translateX(-50%) scaleX(var(--rs, 1)); }
+.ProseMirror .grp.h .rb[data-side="over"] .rt { bottom: 100%; }
+.ProseMirror .grp.h .rb[data-side="under"] .rt { top: 100%; }
+.ProseMirror .grp.v .rb .rt { top: 50%; transform: translateY(-50%) scaleY(var(--rs, 1)); }
+.ProseMirror .grp.v .rb[data-side="over"] .rt { left: 100%; }
+.ProseMirror .grp.v .rb[data-side="under"] .rt { right: 100%; }
 
 /* the box to write a ruby */
 .ruby-box { flex-direction: column; align-items: stretch; gap: 4px; padding: 6px; width: 17rem; max-width: calc(100vw - 16px); }
@@ -121,14 +123,6 @@ body { background: var(--paper-2); }
 body.toolbar-bottom .page { padding-bottom: 50vh; }
 .toolbar.bottom button { min-width: 1.85rem; padding: 0 .3rem; }
 .toolbar.bottom .sep { margin: 5px 2px; }
-
-/* the plus on an empty line and its menu */
-.scroll-plus { position: absolute; z-index: 1050; width: 2rem; height: 2rem; border-radius: 50%; border: 1px solid var(--bs-border-color);
-    background: var(--bs-body-bg); color: var(--bs-secondary-color); display: flex; align-items: center; justify-content: center; padding: 0; transition: transform .15s; }
-.scroll-plus[hidden] { display: none; }
-.scroll-plus.open { transform: rotate(45deg); }
-.scroll-plus-menu { flex-direction: column; align-items: stretch; }
-.scroll-plus-menu button { text-align: start; display: flex; align-items: center; gap: .5rem; }
 
 /* heading button: the H with the level beside it */
 .h-icon sub { font-size: .6em; font-weight: 700; bottom: 0; margin-left: 1px; }
