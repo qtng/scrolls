@@ -63,6 +63,14 @@
       <button id="redo-btn" class="bar-btn" type="button" disabled aria-label="Redo" data-vi-aria-label="Làm lại" title="Redo" data-vi-title="Làm lại"><span class="uni" aria-hidden="true">↷</span></button>
       <span id="page-new" class="page-tools"></span>
       <span class="grow"></span>
+      <input id="read-zoom" class="read-zoom" type="range" min="50" max="300" step="10" value="100" autocomplete="off" aria-label="Size" data-vi-aria-label="Cỡ chữ">
+      <span class="grow"></span>
+      <button id="keep-btn" class="icon-btn" type="button" hidden aria-label="Add to my notes" data-vi-aria-label="Thêm vào ghi chú của tôi" title="Add to my notes" data-vi-title="Thêm vào ghi chú của tôi"><i class="fa-solid fa-copy"></i></button>
+      <button id="share-btn" class="icon-btn" type="button" aria-label="Share" data-vi-aria-label="Chia sẻ" aria-haspopup="true" aria-expanded="false"><i class="fa-solid fa-share-nodes"></i></button>
+      <div id="share-menu" class="menu" hidden>
+        <button id="share-link" type="button"><i class="fa-solid fa-link"></i> <span data-vi="Chia sẻ liên kết">Share link</span></button>
+        <button id="share-end" type="button" hidden><i class="fa-solid fa-link-slash"></i> <span data-vi="Dừng chia sẻ">Stop sharing</span></button>
+      </div>
       <button id="edit-btn" class="icon-btn" type="button" aria-label="Edit" data-vi-aria-label="Chỉnh sửa"><i class="fa-solid fa-pencil"></i></button>
       <button id="style-btn" class="style-btn" type="button" aria-label="Style" data-vi-aria-label="Kiểu" aria-haspopup="true" aria-expanded="false"></button>
       <div id="style-menu" class="menu" hidden><div id="set-style" role="radiogroup"></div></div>

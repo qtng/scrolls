@@ -12,6 +12,8 @@ A document deleted here is deleted in the account at the next sync (its id waits
   DocsSync.user, DocsSync.service the SupabaseService (js/supabase.js of qatt.org) for the login dialog
   await DocsSync.run(local, store, { skip })   local: the documents of the browser; store: db.js; skip: the id of the open document (not downloaded now)
                                  returns { docs, changed }: the documents after the sync and whether any changed here
+  DocsSync.shareCode(id)         the code of the link of a document of the account (null: not shared); shareCreate(id) makes it, shareEnd(id) deletes it
+  await DocsSync.shareGet(code)  the shared document (as a document of the app) or null; works without an account
   DocsSync.forget(id)            a document deleted here: delete it in the account at the next sync (unforget(id): it came back)
 */
 const DocsSync = (() => {
@@ -111,8 +113,32 @@ const DocsSync = (() => {
     return { docs: [...docs.values()].sort((a, b) => b.updated - a.updated), changed };
   }
 
+  // the links: the table scroll_shares (the owner reads, makes and deletes his own) and the function share_get(code) (everybody; the code is the secret)
+  async function shareCode(id) {
+    if (!user) return null;
+    const { data, error } = await sp.client.from('scroll_shares').select('code').eq('scroll_id', id).maybeSingle();
+    if (error) throw error;
+    return data ? data.code : null;
+  }
+  async function shareCreate(id) {
+    const { data, error } = await sp.client.from('scroll_shares').insert({ scroll_id: id }).select('code').single();
+    if (error) throw error;
+    return data.code;
+  }
+  async function shareEnd(id) {
+    const { error } = await sp.client.from('scroll_shares').delete().eq('scroll_id', id);
+    if (error) throw error;
+  }
+  async function shareGet(code) {
+    if (!sp || !sp.client) await init();
+    if (!sp || !sp.client) return null;
+    const { data, error } = await sp.client.rpc('share_get', { p_code: code });
+    if (error) throw error;
+    return data ? fromRow({ ...data, created_at: data.updated_at }) : null;
+  }
+
   return {
-    init, run,
+    init, run, shareCode, shareCreate, shareEnd, shareGet,
     get user() { return user; },
     get service() { return sp; },
     forget(id) { keepDeleted([...deletedIds(), id]); },
