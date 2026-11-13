@@ -501,18 +501,41 @@ window.notesApp = { store, ready, flush() } is for the tests.
   }
   const step25 = (v, lo, hi) => Math.min(hi, Math.max(lo, Math.round((Number(v) || 100) / 25) * 25));
   // the zoom: the middle of what is seen stays where it is (a page wider than the screen scrolls sideways); a vertical page begins at its right edge
-  const setZoom = (value, user) => {
+  // the zoom: the point of the document under `at` (client coordinates; default the middle of the field) stays where it is; on opening a vertical
+  // page begins at its right edge (a page wider than the screen scrolls sideways)
+  const setZoom = (value, user, at) => {
     zoom = Math.min(300, Math.max(50, Number(value) || 100));   // continuous (the font size moves in steps)
     $('read-zoom').value = zoom;
-    const f = $('field'), cx = user && f.scrollWidth > f.clientWidth ? (f.scrollLeft + f.clientWidth / 2) / f.scrollWidth : null;
-    const cy = user ? (f.scrollTop + f.clientHeight / 2) / Math.max(1, f.scrollHeight) : null;
+    const f = $('field'), r = f.getBoundingClientRect();
+    const ax = at ? at.x - r.left : f.clientWidth / 2, ay = at ? at.y - r.top : f.clientHeight / 2;
+    const rx = (f.scrollLeft + ax) / Math.max(1, f.scrollWidth), ry = (f.scrollTop + ay) / Math.max(1, f.scrollHeight);
     applySize();
     requestAnimationFrame(() => requestAnimationFrame(() => {
-      if (cx !== null) f.scrollLeft = cx * f.scrollWidth - f.clientWidth / 2;
+      if (user) { f.scrollLeft = rx * f.scrollWidth - ax; f.scrollTop = ry * f.scrollHeight - ay; }
       else if (f.querySelector('.grp.v')) f.scrollLeft = f.scrollWidth;
-      if (cy !== null) f.scrollTop = cy * f.scrollHeight - f.clientHeight / 2;
     }));
   };
+  // pinch with two fingers on the document (reading), Ctrl + wheel or a pinch on a touchpad: the zoom (the zoom of the browser stays off: it would
+  // also enlarge the bars)
+  {
+    const field = $('field'), reading = () => !NomEditor.editable;
+    let pinch = null, frame = 0, next = null;
+    const later = (value, at) => { next = { value, at }; if (!frame) frame = requestAnimationFrame(() => { frame = 0; setZoom(next.value, true, next.at); }); };
+    const spread = t => Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
+    const mid = t => ({ x: (t[0].clientX + t[1].clientX) / 2, y: (t[0].clientY + t[1].clientY) / 2 });
+    field.addEventListener('touchstart', e => { if (e.touches.length === 2 && reading()) pinch = { d: spread(e.touches), z: zoom }; }, { passive: true });
+    field.addEventListener('touchmove', e => {
+      if (!pinch || e.touches.length !== 2) return;
+      e.preventDefault();
+      later(pinch.z * spread(e.touches) / pinch.d, mid(e.touches));
+    }, { passive: false });
+    field.addEventListener('touchend', e => { if (e.touches.length < 2) pinch = null; });
+    field.addEventListener('wheel', e => {
+      if (!e.ctrlKey || !reading()) return;
+      e.preventDefault();
+      later((next && frame ? next.value : zoom) * Math.exp(-e.deltaY * 0.01), { x: e.clientX, y: e.clientY });
+    }, { passive: false });
+  }
   // the font size of the document
   const setFontSize = (value, user) => {
     const v = step25(value, 25, 400);
