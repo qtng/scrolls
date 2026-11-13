@@ -490,14 +490,14 @@ window.notesApp = { store, ready, flush() } is for the tests.
   // The unit (--unit) is the size of a character of 100%: the page is format.width units wide, the text is fontSize % of a unit. (Later a size of
   // a paragraph or a character can be relative to the text of the document, in em.)
   let zoom = 100;
-  function applySize() {
+  function applySize(relayout = true) {   // a zoom alone needs no new layout: the layout is in em
     const doc = state.current, w = doc && doc.format && doc.format.width > 0 ? doc.format.width : pageWidth();
     // the document fills the width of the screen: smaller where it does not fit, larger where there is room, but at most twice its size
     const fit = Math.min(2, room() / (w * BASE)), unit = BASE * fit * zoom / 100, scale = formatOf(doc).fontSize / 100;
     document.documentElement.style.setProperty('--page-em', String(w));
     document.documentElement.style.setProperty('--unit', unit.toFixed(2) + 'px');
     document.documentElement.style.setProperty('--doc-size', (unit * scale).toFixed(2) + 'px');
-    NomEditor.relayout();
+    if (relayout) NomEditor.relayout();
   }
   const step25 = (v, lo, hi) => Math.min(hi, Math.max(lo, Math.round((Number(v) || 100) / 25) * 25));
   // the zoom: the middle of what is seen stays where it is (a page wider than the screen scrolls sideways); a vertical page begins at its right edge
@@ -509,7 +509,7 @@ window.notesApp = { store, ready, flush() } is for the tests.
     const f = $('field'), r = f.getBoundingClientRect();
     const ax = at ? at.x - r.left : f.clientWidth / 2, ay = at ? at.y - r.top : f.clientHeight / 2;
     const rx = (f.scrollLeft + ax) / Math.max(1, f.scrollWidth), ry = (f.scrollTop + ay) / Math.max(1, f.scrollHeight);
-    applySize();
+    applySize(false);
     const place = () => {
       if (user) { f.scrollLeft = rx * f.scrollWidth - ax; f.scrollTop = ry * f.scrollHeight - ay; }
       else if (f.querySelector('.grp.v')) f.scrollLeft = f.scrollWidth;

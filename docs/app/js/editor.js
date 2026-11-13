@@ -380,7 +380,7 @@ function segments(chars, widths, offset, len, half) {
             style = `inline-size: ${em(size)};`;
             if (whole - size > tol) style += ` padding-inline-end: ${em(whole - size)};`;
         }
-        if (!out.length && startPad) style += ` margin-inline-start: ${startPad.toFixed(2)}px;`;
+        if (!out.length && startPad) style += ` margin-inline-start: ${em(startPad)};`;
         const units = chars.slice(i, j).join('').length;
         out.push({ from: u, to: u + units, style });
         i = j; u += units;
@@ -491,9 +491,9 @@ class Layout {
             const pad = { t: parseFloat(cs.paddingTop) + parseFloat(cs.borderTopWidth), b: parseFloat(cs.paddingBottom) + parseFloat(cs.borderBottomWidth),
                 l: parseFloat(cs.paddingLeft) + parseFloat(cs.borderLeftWidth), r: parseFloat(cs.paddingRight) + parseFloat(cs.borderRightWidth) };
             const len = v ? (+sec.dataset.cols || DEFAULT_COLS) * em : sec.offsetWidth - pad.l - pad.r;
-            info.set(sec, { v, gap, len, pad, pitch: len + gap });
-            sec.style.setProperty('--seg-shift', (v ? measure.segShift(cs) : measure.segShiftH(cs)).toFixed(2) + 'px');   // two-column text on the axis of its line
-            if (v) sec.style.height = (200 * (len + gap) + pad.t + pad.b) + 'px';   // generous first, cut to whole bands below
+            info.set(sec, { v, gap, len, pad, pitch: len + gap, em });
+            sec.style.setProperty('--seg-shift', ((v ? measure.segShift(cs) : measure.segShiftH(cs)) / (em / 2)).toFixed(4) + 'em');   // two-column text on the axis of its line (em of the half size where it is used)
+            if (v) sec.style.height = ((200 * (len + gap) + pad.t + pad.b) / em).toFixed(4) + 'em';   // generous first, cut to whole bands below
         }
         const runs = wariRuns(view.state.doc), mks = view.dom.querySelectorAll('i.mk');
         const decos = [], sig = [];
@@ -529,7 +529,7 @@ class Layout {
             let bottom = top;
             for (const rc of range.getClientRects()) if (rc.width || rc.height) bottom = Math.max(bottom, rc.bottom);
             const bands = Math.max(1, Math.floor((bottom - top - 1) / inf.pitch) + 1);
-            sec.style.height = (bands * inf.pitch - inf.gap + inf.pad.t + inf.pad.b) + 'px';
+            sec.style.height = ((bands * inf.pitch - inf.gap + inf.pad.t + inf.pad.b) / inf.em).toFixed(4) + 'em';
         }
         // ruby longer than its base is narrowed (the base keeps its cell)
         for (const rb of view.dom.querySelectorAll('.rb')) {
