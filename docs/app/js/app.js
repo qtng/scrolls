@@ -114,7 +114,7 @@ window.notesApp = { store, ready, flush() } is for the tests.
   if (window.VietIme) new VietIme(titleInput, { telex: true, candidates: false });
   function editTitle(on, commit) {
     if (on) {
-      if (!state.current || state.shared) return;
+      if (!state.current || state.shared || !NomEditor.editable) return;   // the title is set while editing only
       titleInput.value = DocsCore.title(NomEditor.text(), state.current.title);
       $('editor-title').hidden = true; titleInput.hidden = false; titleInput.focus(); titleInput.select();
       return;
