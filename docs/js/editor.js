@@ -1,15 +1,17 @@
 /*
 The editor of a scroll (edit.html?id=<uuid>; edit.html?local: a test mode without login, kept in this browser only).
 
-A scroll is sections of blocks: doc > section+ > (paragraph | heading)+. A section is horizontal (flowing text) or vertical
-(columns of `cols` characters, right to left, continued in bands below). Two-column text (warichu) is a mark; editor.js lays it
-out as segments (inline decorations), the bands of vertical sections get their height here. ProseMirror comes from js/prosemirror.js
+A scroll is doc > section+ > group+ > (paragraph | heading)+. A section is a box (kind 'text'; later pictures or tables). The direction
+(horizontal: flowing text; vertical: columns of `cols` characters, right to left, continued in bands below) belongs to the paragraph; the
+paragraphs in a row with the same settings are a group, which keeps the settings. The groups are kept by the editor alone: a change of the
+settings splits them, neighbours with the same settings are joined (normalizePlugin); the user never sees them. Two-column text (warichu)
+is a mark; editor.js lays it out as segments (inline decorations), the bands of vertical groups get their height here. ProseMirror comes from js/prosemirror.js
 (window.PM, built in the private repository), the Telex input from /chunom/js/ime.js (no candidate list).
 */
 (() => {
 'use strict';
 const { Schema, EditorState, EditorView, Plugin, PluginKey, TextSelection, Decoration, DecorationSet, keymap, history, undo, redo,
-        baseKeymap, toggleMark, setBlockType, dropCursor, Fragment, Slice } = PM;
+        baseKeymap, toggleMark, setBlockType, dropCursor, Fragment, Slice, joinBackward, joinForward } = PM;
 const QATT = 'https://qatt.org';
 
 const T = (en, vi) => (window.Lang ? Lang.t(en, vi) : en);
@@ -25,12 +27,20 @@ const titled = (e, en, viText) => { e.title = en; e.setAttribute('data-vi-title'
 const schema = new Schema({
     nodes: {
         doc: { content: 'section+' },
+        // the box; kind 'text' holds the groups of paragraphs (other kinds later: a picture, a table)
         section: {
-            content: 'block+',
+            content: 'group+',
             isolating: true,
+            attrs: { kind: { default: 'text' } },
+            parseDOM: [{ tag: 'section.sec' }],
+            toDOM: n => ['section', { class: 'sec shadow p-3', 'data-kind': n.attrs.kind }, 0],
+        },
+        // paragraphs in a row with the same direction and characters per column (kept by the editor, see above)
+        group: {
+            content: 'block+',
             attrs: { dir: { default: 'v' }, cols: { default: DEFAULT_COLS } },
-            parseDOM: [{ tag: 'section.sec', getAttrs: d => ({ dir: d.dataset.dir === 'h' ? 'h' : 'v', cols: clampCols(+d.dataset.cols) }) }],
-            toDOM: n => ['section', { class: 'sec shadow p-3 ' + n.attrs.dir, 'data-dir': n.attrs.dir, 'data-cols': n.attrs.cols, style: `--cols: ${n.attrs.cols}` }, 0],
+            parseDOM: [{ tag: 'div.grp', getAttrs: d => ({ dir: d.dataset.dir === 'h' ? 'h' : 'v', cols: clampCols(+d.dataset.cols) }) }],
+            toDOM: n => ['div', { class: 'grp ' + n.attrs.dir, 'data-dir': n.attrs.dir, 'data-cols': n.attrs.cols, style: `--cols: ${n.attrs.cols}` }, 0],
         },
         paragraph: { group: 'block', content: 'inline*', parseDOM: [{ tag: 'p' }], toDOM: () => ['p', 0] },
         heading: {
@@ -54,22 +64,39 @@ const schema = new Schema({
     },
 });
 const S = schema.nodes;
-const emptyDoc = (dir = 'v') => S.doc.create(null, S.section.create({ dir, cols: DEFAULT_COLS }, S.paragraph.create()));
+const emptyDoc = (dir = 'v') => S.doc.create(null, S.section.create(null, S.group.create({ dir, cols: DEFAULT_COLS }, S.paragraph.create())));
+// two groups with these settings are one (horizontal text has no characters per column)
+const sameSettings = (a, b) => a.dir === b.dir && (a.dir === 'h' || a.cols === b.cols);
+// the group of a position (null outside the text)
+const groupOf = $pos => { for (let d = $pos.depth; d > 0; d--) if ($pos.node(d).type === S.group) return { node: $pos.node(d), pos: $pos.before(d), depth: d }; return null; };
 
-// a section keeps its element when its text changes; the height that the layout sets is not a change of the document
-class SectionView {
-    constructor(node) { this.dom = this.contentDOM = document.createElement('section'); this.node = null; this.set(node); }
+// a stored scroll of the first version (doc > section{dir, cols} > blocks) becomes one section with a group for each of its sections
+function upgrade(json) {
+    const secs = (json && json.content) || [];
+    if (!secs.length || !secs[0].content || !secs[0].content.length || secs[0].content[0].type === 'group') return json;
+    const groups = [];
+    for (const sec of secs) {
+        const a = sec.attrs || {}, attrs = { dir: a.dir === 'h' ? 'h' : 'v', cols: clampCols(+a.cols) }, last = groups[groups.length - 1];
+        if (last && sameSettings(last.attrs, attrs)) last.content.push(...(sec.content || []));
+        else groups.push({ type: 'group', attrs, content: [...(sec.content || [])] });
+    }
+    return { type: 'doc', content: [{ type: 'section', attrs: { kind: 'text' }, content: groups }] };
+}
+
+// a group keeps its element when its text changes; the height that the layout sets is not a change of the document
+class GroupView {
+    constructor(node) { this.dom = this.contentDOM = document.createElement('div'); this.node = null; this.set(node); }
     set(node) {
         const d = this.dom, a = node.attrs;
         if (!this.node || this.node.attrs.dir !== a.dir) d.style.height = '';
-        d.className = 'sec shadow p-3 ' + a.dir;
+        d.className = 'grp ' + a.dir;
         d.dataset.dir = a.dir;
         d.dataset.cols = a.cols;
         d.style.setProperty('--cols', a.cols);
         this.node = node;
     }
     update(node) {
-        if (node.type !== S.section) return false;
+        if (node.type !== S.group) return false;
         if (node.attrs.dir !== this.node.attrs.dir || node.attrs.cols !== this.node.attrs.cols) this.set(node); else this.node = node;
         return true;
     }
@@ -77,23 +104,92 @@ class SectionView {
 }
 
 // ---------------------------------------------------------------- commands
-const sectionAt = $pos => ({ node: $pos.node(1), pos: $pos.before(1), index: $pos.index(0) });
+// The settings (dir, cols) of the paragraphs that the selection touches (or of the one with the caret), as in a word processor:
+// their group is split around them and gets the settings; normalizePlugin joins it with neighbours that have the same ones.
+function setSettings(change) {
+    return (state, dispatch) => {
+        const { from, to } = state.selection, touched = [];
+        state.doc.nodesBetween(from, to, (node, pos, parent, index) => {
+            if (node.type === S.group) { touched.push({ pos, node, first: -1, last: -1 }); return true; }
+            if (node.isTextblock) { const g = touched[touched.length - 1]; if (g && parent === g.node) { if (g.first < 0) g.first = index; g.last = index; } return false; }
+            return true;
+        });
+        const tr = state.tr;
+        for (let k = touched.length - 1; k >= 0; k--) {   // from the end: the positions before stay
+            const g = touched[k], a = g.node.attrs;
+            if (g.first < 0) continue;
+            const attrs = { ...a, ...change };
+            if (attrs.dir === a.dir && attrs.cols === a.cols) continue;
+            let start = g.pos + 1;
+            for (let i = 0; i < g.first; i++) start += g.node.child(i).nodeSize;
+            let end = start;
+            for (let i = g.first; i <= g.last; i++) end += g.node.child(i).nodeSize;
+            if (g.last < g.node.childCount - 1) tr.split(end, 1);
+            let at = g.pos;
+            if (g.first > 0) { tr.split(start, 1); at = start + 1; }
+            tr.setNodeMarkup(at, null, attrs);
+        }
+        if (!tr.docChanged) return false;
+        if (dispatch) dispatch(tr.scrollIntoView());
+        return true;
+    };
+}
 
-// Backspace at the start of a section joins it with the one before (whose settings win); Delete at its end with the next one
-function joinSectionBackward(state, dispatch) {
+// Backspace at the start of the first paragraph of a group: the paragraph first takes the settings of the one before (it joins it),
+// so that only it changes, not the rest of its group. Delete at the end of the last paragraph of a group: the same with the next one.
+function joinGroupBackward(state, dispatch, view) {
     const { $cursor } = state.selection;
-    if (!$cursor || $cursor.parentOffset > 0 || $cursor.depth !== 2 || $cursor.index(1) !== 0 || $cursor.index(0) === 0) return false;
-    if (dispatch) dispatch(state.tr.join($cursor.before(1)).scrollIntoView());
+    if (!$cursor || $cursor.parentOffset > 0) return false;
+    const g = groupOf($cursor);
+    if (!g || $cursor.index(g.depth) !== 0 || $cursor.index(g.depth - 1) === 0) return false;
+    const prev = $cursor.node(g.depth - 1).child($cursor.index(g.depth - 1) - 1);
+    if (!dispatch) return true;
+    setSettings(prev.attrs)(state, dispatch);
+    if (view) joinBackward(view.state, view.dispatch);
     return true;
 }
-function joinSectionForward(state, dispatch) {
+function joinGroupForward(state, dispatch, view) {
     const { $cursor } = state.selection;
-    if (!$cursor || $cursor.depth !== 2 || $cursor.parentOffset < $cursor.parent.content.size) return false;
-    const sec = $cursor.node(1);
-    if ($cursor.index(1) !== sec.childCount - 1 || $cursor.index(0) === state.doc.childCount - 1) return false;
-    if (dispatch) dispatch(state.tr.join($cursor.after(1)).scrollIntoView());
+    if (!$cursor || $cursor.parentOffset < $cursor.parent.content.size) return false;
+    const g = groupOf($cursor);
+    if (!g) return false;
+    const box = $cursor.node(g.depth - 1), gi = $cursor.index(g.depth - 1);
+    if ($cursor.index(g.depth) !== g.node.childCount - 1 || gi === box.childCount - 1) return false;
+    if (!dispatch) return true;
+    const nextStart = g.pos + g.node.nodeSize + 2;   // in the first paragraph of the next group
+    const tr = state.tr.setSelection(TextSelection.create(state.doc, nextStart));
+    const moved = state.apply(tr);
+    setSettings(g.node.attrs)(moved, t => {
+        // the settings on the next paragraph, the caret back where it was
+        for (const step of t.steps) tr.step(step);
+        tr.setSelection(TextSelection.create(tr.doc, $cursor.pos));
+        dispatch(tr);
+    });
+    if (view) joinForward(view.state, view.dispatch);
     return true;
 }
+
+// groups next to each other with the same settings become one (after every change)
+const normalizePlugin = new Plugin({
+    appendTransaction(trs, old, state) {
+        if (!trs.some(t => t.docChanged)) return null;
+        const joins = [];
+        state.doc.forEach((sec, secPos) => {
+            if (sec.type !== S.section) return;
+            let pos = secPos + 1, prev = null;
+            sec.forEach(child => {
+                if (prev && prev.type === S.group && child.type === S.group && sameSettings(prev.attrs, child.attrs)) joins.push(pos);
+                prev = child;
+                pos += child.nodeSize;
+            });
+        });
+        if (!joins.length) return null;
+        const tr = state.tr;
+        for (let i = joins.length - 1; i >= 0; i--) tr.join(joins[i]);
+        return tr;
+    },
+});
+
 const setHeading = level => (state, dispatch) => {
     const { $from } = state.selection;
     const on = $from.parent.type === S.heading && $from.parent.attrs.level === level;
@@ -101,33 +197,6 @@ const setHeading = level => (state, dispatch) => {
 };
 const toggleWari = toggleMark(schema.marks.warichu);
 const openRuby = () => { RubyBox.open(); return true; };
-
-// the empty paragraph with the caret becomes a section of its own (dir); the text before and after keeps the old section and its settings
-function insertSection(view, dir) {
-    const { state } = view, { $from } = state.selection;
-    if ($from.depth !== 2) return;
-    const sec = sectionAt($from), para = $from.parent;
-    const lastV = (() => { let c = null; state.doc.forEach(s => { if (s.attrs.dir === 'v' && c === null) c = s.attrs.cols; }); return c; })();
-    const cols = sec.node.attrs.dir === 'v' ? sec.node.attrs.cols : (lastV || DEFAULT_COLS);
-    let tr = state.tr;
-    if (sec.node.childCount === 1) {
-        tr.setNodeMarkup(sec.pos, null, { ...sec.node.attrs, dir, cols });
-        tr.setSelection(TextSelection.create(tr.doc, sec.pos + 2));
-    } else {
-        const before = sec.node.content.cut(0, $from.before(2) - sec.pos - 1);
-        const after = sec.node.content.cut($from.after(2) - sec.pos - 1);
-        const parts = [];
-        if (before.size) parts.push(S.section.create(sec.node.attrs, before));
-        const fresh = S.section.create({ dir, cols }, S.paragraph.create(null, para.content));
-        parts.push(fresh);
-        if (after.size) parts.push(S.section.create(sec.node.attrs, after));
-        tr.replaceWith(sec.pos, sec.pos + sec.node.nodeSize, parts);
-        const freshPos = sec.pos + (before.size ? before.size + 2 : 0);
-        tr.setSelection(TextSelection.create(tr.doc, freshPos + 2));
-    }
-    view.dispatch(tr.scrollIntoView());
-    view.focus();
-}
 
 // ---------------------------------------------------------------- two-column text and bands: the layout
 const layoutKey = new PluginKey('layout');
@@ -190,7 +259,7 @@ function segments(chars, widths, offset, len, half) {
             let total = 0, first = 0, k = i;
             for (let x = i; x < j; x++) total += widths[x];
             while (k < j && first < total / 2 - tol) first += widths[k++];
-            const size = Math.min(cap, first + 0.5), whole = Math.max(cell, Math.ceil((first - tol) / cell) * cell);
+            const whole = Math.max(cell, Math.ceil((first - tol) / cell) * cell), size = Math.min(cap, whole, first + 0.5);   // never longer than its cells
             style = `inline-size: ${em(size)};`;
             if (whole - size > tol) style += ` padding-inline-end: ${em(whole - size)};`;
         }
@@ -237,7 +306,7 @@ const layoutPlugin = new Plugin({
             const marks = wariRuns(state.doc).map(r => Decoration.widget(r.from, () => el('i', { className: 'mk' }), { side: -1, marks: [], ignoreSelection: true, key: 'mk' }));
             return layoutKey.getState(state).add(state.doc, marks);
         },
-        nodeViews: { section: node => new SectionView(node) },
+        nodeViews: { group: node => new GroupView(node) },
         markViews: { ruby: mark => rubyView(mark) },
 // text with the annotation of the QATT fonts (CJK, U+F00B0 over / U+F00B1 under, a PA syllable) becomes ruby
         transformPasted: slice => new Slice(annotToRuby(slice.content), slice.openStart, slice.openEnd),
@@ -268,7 +337,7 @@ class Layout {
     run() {
         const view = this.view;
         if (view.composing) return;   // after the composition (compositionend)
-        const sections = [...view.dom.children].filter(e => e.matches('section.sec'));
+        const sections = [...view.dom.querySelectorAll('div.grp')];   // the groups (a vertical one is laid out in bands)
         const info = new Map();
         for (const sec of sections) {
             const v = sec.dataset.dir === 'v', cs = getComputedStyle(sec), em = parseFloat(cs.fontSize);
@@ -283,7 +352,7 @@ class Layout {
         const decos = [], sig = [];
         if (mks.length === runs.length) {
             runs.forEach((run, k) => {
-                const mk = mks[k], sec = mk.closest('section.sec'), inf = info.get(sec);
+                const mk = mks[k], sec = mk.closest('div.grp'), inf = info.get(sec);
                 if (!inf) return;
                 const pcs = getComputedStyle(mk.parentElement), half = parseFloat(pcs.fontSize) / 2;   // a character of the two-column text
                 const chars = [...run.text];
@@ -304,7 +373,7 @@ class Layout {
             view.dispatch(view.state.tr.setMeta(layoutKey, DecorationSet.create(view.state.doc, decos)).setMeta('addToHistory', false));
             return;   // the update schedules the next pass: a run moves when the runs before it have changed
         }
-        // the bands: cut every vertical section to the bands that hold text
+        // the bands: cut every vertical group to the bands that hold text
         for (const sec of sections) {
             const inf = info.get(sec);
             if (!inf.v) continue;
@@ -319,7 +388,7 @@ class Layout {
         for (const rb of view.dom.querySelectorAll('.rb')) {
             const base = rb.firstElementChild, rt = rb.lastElementChild;
             if (!base || !rt || !rt.textContent) continue;
-            const v = !!rb.closest('.sec.v'), r = base.getBoundingClientRect();
+            const v = !!rb.closest('.grp.v'), r = base.getBoundingClientRect();
             const baseLen = v ? r.height : r.width, rtLen = v ? rt.offsetHeight : rt.offsetWidth;
             const allowed = baseLen + 0.2 * parseFloat(getComputedStyle(base).fontSize);
             const scale = rtLen > allowed ? (allowed / rtLen).toFixed(3) : '1';
@@ -412,8 +481,9 @@ const placeholderPlugin = new Plugin({
     props: {
         decorations(state) {
             const doc = state.doc;
-            if (doc.childCount !== 1 || doc.firstChild.childCount !== 1 || doc.firstChild.firstChild.content.size) return null;
-            return DecorationSet.create(doc, [Decoration.node(1, 1 + doc.firstChild.firstChild.nodeSize, { class: 'is-empty', 'data-placeholder': T('Write…', 'Viết…') })]);
+            const sec = doc.firstChild, grp = sec && sec.firstChild, para = grp && grp.firstChild;
+            if (doc.childCount !== 1 || sec.childCount !== 1 || grp.type !== S.group || grp.childCount !== 1 || para.content.size) return null;
+            return DecorationSet.create(doc, [Decoration.node(2, 2 + para.nodeSize, { class: 'is-empty', 'data-placeholder': T('Write…', 'Viết…') })]);
         },
     },
 });
@@ -443,7 +513,7 @@ const UI = {
         this.bWari = btn(vi('split', 'chia'), 'Two-column text', 'Chữ hai dòng', cmd(toggleWari));
         this.bWari.classList.add('txt');
         this.bRuby = btn(icon('fa-pencil'), 'Ruby (reading)', 'Chú âm', () => RubyBox.open());
-        // the section settings are drop-downs; the group label says what the option is
+        // the settings of the paragraphs are drop-downs; the group label of the list says what the option is
         const select = (label, labelVi, options, change) => {
             const sel = el('select', { className: 'form-select form-select-sm' });
             const g = el('optgroup', { label });
@@ -454,28 +524,9 @@ const UI = {
             sel.addEventListener('change', () => { if (this.view) { change(sel.value); this.view.focus(); } });
             return sel;
         };
-        this.selDir = select('Text direction', 'Hướng chữ', [['h', 'Horizontal', 'Ngang'], ['v', 'Vertical', 'Dọc']], v => this.setSection({ dir: v }));
-        this.selCols = select('Characters per column', 'Số chữ mỗi cột', COLS_OPTIONS.map(n => [String(n), String(n)]), v => this.setSection({ cols: +v }));
-        this.bDel = btn(icon('fa-trash'), 'Delete section', 'Xóa phần', () => this.deleteSection());
-        this.bar.append(this.bH1, this.bH2, this.bWari, this.bRuby, sep(), this.selDir, this.selCols, sep(), this.bDel);
-
-        // the plus on an empty line (floating, as on Medium): a new section there
-        this.plus = el('button', { type: 'button', className: 'scroll-plus', hidden: true });
-        this.plus.append(icon('fa-plus'));
-        titled(this.plus, 'New section', 'Phần mới');
-        this.plus.addEventListener('mousedown', e => e.preventDefault());
-        this.plus.addEventListener('click', () => { this.menuOpen = !this.menuOpen; this.refresh(); });
-        const item = (ic, en, viText, dir) => {
-            const b = btn(icon(ic), en, viText, () => { this.menuOpen = false; insertSection(this.view, dir); });
-            b.append(vi(en, viText));
-            return b;
-        };
-        this.plusMenu = el('div', { className: 'scroll-ui scroll-plus-menu bg-light', hidden: true },
-            item('fa-grip-lines', 'Horizontal section', 'Phần ngang', 'h'), item('fa-grip-lines-vertical', 'Vertical section', 'Phần dọc', 'v'));
-        document.body.append(this.plus, this.plusMenu);
-        document.addEventListener('pointerdown', e => {
-            if (this.menuOpen && !this.plusMenu.contains(e.target) && !this.plus.contains(e.target)) { this.menuOpen = false; this.refresh(); }
-        });
+        this.selDir = select('Text direction', 'Hướng chữ', [['h', 'Horizontal', 'Ngang'], ['v', 'Vertical', 'Dọc']], v => this.setSettings({ dir: v }));
+        this.selCols = select('Characters per column', 'Số chữ mỗi cột', COLS_OPTIONS.map(n => [String(n), String(n)]), v => this.setSettings({ cols: clampCols(+v) }));
+        this.bar.append(this.bH1, this.bH2, this.bWari, this.bRuby, sep(), this.selDir, this.selCols);
 
         const pos = () => this.position();
         if (window.visualViewport) for (const ev of ['resize', 'scroll']) visualViewport.addEventListener(ev, pos);
@@ -510,58 +561,27 @@ const UI = {
         const inRuby = sel.empty && rubyAt(state, sel.from);
         on(this.bRuby, inRuby || (!sel.empty && state.doc.rangeHasMark(sel.from, sel.to, ruby)));
         this.bRuby.disabled = !(inRuby || (!sel.empty && $f.parent === sel.$to.parent && !state.doc.rangeHasMark(sel.from, sel.to, wari)));
-        const a = $f.depth >= 1 ? $f.node(1).attrs : null;
-        const vert = !!a && a.dir === 'v';
-        if (a) {
-            this.selDir.value = a.dir;
-            const have = [...this.selCols.options].some(o => o.value === String(a.cols));
-            if (!have) {   // a value from before (or typed by hand) that the list does not have
-                const o = el('option', { value: String(a.cols) }); o.textContent = String(a.cols);
-                const opts = [...this.selCols.options];
-                const at = opts.find(x => +x.value > a.cols);
-                this.selCols.firstChild.insertBefore(o, at || null);
-            }
-            this.selCols.value = String(a.cols);
+        // the settings of the paragraphs in the selection: shown when they are the same, else the field is empty
+        const dirs = new Set(), cols = new Set();
+        state.doc.nodesBetween(sel.from, sel.to, node => {
+            if (node.type === S.group) { dirs.add(node.attrs.dir); if (node.attrs.dir === 'v') cols.add(node.attrs.cols); return false; }
+            return true;
+        });
+        const one = set => (set.size === 1 ? [...set][0] : null);
+        const dir = one(dirs), c = one(cols);
+        if (c !== null && ![...this.selCols.options].some(o => o.value === String(c))) {   // a value from before that the list does not have
+            const o = el('option', { value: String(c) }); o.textContent = String(c);
+            const at = [...this.selCols.options].find(x => +x.value > c);
+            this.selCols.firstChild.insertBefore(o, at || null);
         }
-        this.selDir.disabled = !a;
-        this.selCols.disabled = !vert;
-        this.bDel.disabled = state.doc.childCount < 2;
+        this.selDir.value = dir || '';
+        this.selCols.value = c !== null ? String(c) : '';
+        this.selDir.disabled = !dirs.size;
+        this.selCols.disabled = !cols.size;
         this.position();
 
-        // the plus on an empty paragraph (vertical: above the column, horizontal: left of the line) and its menu under it
-        const emptyLine = view.hasFocus() && sel.empty && $f.depth === 2 && p.type === S.paragraph && !p.content.size;
-        if (!emptyLine) this.menuOpen = false;
-        this.plus.hidden = !emptyLine;
-        this.plusMenu.hidden = !(emptyLine && this.menuOpen);
-        if (emptyLine) {
-            const c = view.coordsAtPos($f.pos), size = this.plus.offsetWidth || 32;
-            const x = vert ? (c.left + c.right) / 2 - size / 2 : c.left - size - 12, y = vert ? c.top - size - 10 : (c.top + c.bottom) / 2 - size / 2;
-            this.plus.style.left = Math.max(4, x) + scrollX + 'px';
-            this.plus.style.top = Math.max(4, y) + scrollY + 'px';
-            this.plus.classList.toggle('open', !!this.menuOpen);
-            if (this.menuOpen) {
-                const r = this.plus.getBoundingClientRect(), w = this.plusMenu.offsetWidth, vw = document.documentElement.clientWidth;
-                this.plusMenu.style.left = Math.max(8, Math.min(r.left, vw - w - 8)) + 'px';
-                this.plusMenu.style.top = r.bottom + 6 + 'px';
-            }
-        }
     },
-    setSection({ dir, cols }) {
-        const view = this.view, sec = sectionAt(view.state.selection.$from), a = sec.node.attrs;
-        const attrs = { ...a, ...(dir ? { dir } : {}), ...(cols ? { cols: clampCols(cols) } : {}) };
-        if (attrs.dir === a.dir && attrs.cols === a.cols) return;
-        view.dispatch(view.state.tr.setNodeMarkup(sec.pos, null, attrs));
-    },
-    deleteSection() {
-        const view = this.view, { state } = view;
-        if (state.doc.childCount < 2) return;
-        const sec = sectionAt(state.selection.$from);
-        if (sec.node.textContent && !confirm(T('Delete this section with its text?', 'Xóa phần này cùng với chữ trong đó?'))) return;
-        const tr = state.tr.delete(sec.pos, sec.pos + sec.node.nodeSize);
-        const at = Math.min(sec.pos, tr.doc.content.size - 1);
-        tr.setSelection(TextSelection.near(tr.doc.resolve(Math.max(0, at)), 1));
-        view.dispatch(tr.scrollIntoView());
-    },
+    setSettings(change) { setSettings(change)(this.view.state, this.view.dispatch); },
 };
 
 // the box to write a ruby: a field (Quốc Ngữ, with Telex), the readings of the dictionary, the script (QN, PA, QATT), the side, each character
@@ -648,7 +668,7 @@ const RubyBox = {
         for (const b of this.kindBtns) b.classList.toggle('on', b.dataset.k === this.kind);
     },
     markSide() {
-        const vert = this.view.state.doc.resolve(this.range ? this.range.from : 0).node(1)?.attrs.dir === 'v';
+        const g = groupOf(this.view.state.doc.resolve(this.range ? this.range.from : 0)), vert = !!g && g.node.attrs.dir === 'v';
         this.overBtn.firstChild.className = 'fa-solid ' + (vert ? 'fa-arrow-right' : 'fa-arrow-up');
         this.underBtn.firstChild.className = 'fa-solid ' + (vert ? 'fa-arrow-left' : 'fa-arrow-down');
         this.overBtn.classList.toggle('on', this.side === 'over');
@@ -724,10 +744,10 @@ class ImeAdapter {
     setAttribute(n, v) { this.view.dom.setAttribute(n, v); }
     removeAttribute(n) { this.view.dom.removeAttribute(n); }
     addEventListener(...a) { this.view.dom.addEventListener(...a); }
-    // where the candidate list goes: under the caret; in a vertical section to the left of the column, below the caret
+    // where the candidate list goes: under the caret; in a vertical group to the left of the column, below the caret
     getBoundingClientRect() {
         const v = this.view, head = v.state.selection.head, c = v.coordsAtPos(head);
-        const vert = v.state.selection.$head.depth >= 1 && v.state.selection.$head.node(1).attrs.dir === 'v';
+        const g = groupOf(v.state.selection.$head), vert = !!g && g.node.attrs.dir === 'v';
         if (!vert) return { left: c.left, right: c.right, top: c.top, bottom: c.bottom };
         const size = parseFloat(getComputedStyle(v.dom).fontSize);
         const x = Math.min(c.left, c.right) - size * 0.4;
@@ -847,7 +867,7 @@ async function start() {
     applySettings();
 
     let doc = null;
-    if (rec.content && rec.content.type === 'doc') { try { doc = schema.nodeFromJSON(rec.content); doc.check(); } catch (e) { console.error('Content could not be read:', e); doc = null; } }
+    if (rec.content && rec.content.type === 'doc') { try { doc = schema.nodeFromJSON(upgrade(rec.content)); doc.check(); } catch (e) { console.error('Content could not be read:', e); doc = null; } }
     const state = EditorState.create({
         schema,
         doc: doc || emptyDoc(),
@@ -859,11 +879,12 @@ async function start() {
                 'Mod-Shift-d': toggleWari,
                 'Mod-Shift-r': openRuby,
                 'Mod-Shift-Space': () => { document.getElementById('telex').click(); return true; },
-                'Backspace': joinSectionBackward, 'Delete': joinSectionForward,
+                'Backspace': joinGroupBackward, 'Delete': joinGroupForward,
             }),
             keymap(baseKeymap),
             history(),
             dropCursor(),
+            normalizePlugin,
             placeholderPlugin,
             layoutPlugin,
             uiPlugin,
