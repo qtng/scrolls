@@ -441,15 +441,44 @@ class Layout {
         this.passes = 0;
         this.onResize = () => this.schedule(true);
         window.addEventListener('resize', this.onResize);
-        document.fonts?.addEventListener?.('loadingdone', () => { measure.cache.clear(); this.schedule(true); });   // measured again in the loaded font
+        // measured again in the loaded font. "loadingdone" comes only when no other font file is pending or failed (an unused slice that is
+        // slow, a supplement that fails): so also after every failed load, after fonts.ready of every new load, and when a segment overflows (check)
+        this.again = () => { measure.cache.clear(); this.schedule(true); };
+        if (document.fonts && document.fonts.addEventListener) {
+            for (const ev of ['loadingdone', 'loadingerror']) document.fonts.addEventListener(ev, this.again);
+            document.fonts.addEventListener('loading', () => document.fonts.ready.then(this.again));
+        }
+        this.retries = 0;
+        // and when the number of loaded font files changes (some browsers send no event at all then)
+        const loaded = () => { let n = 0; if (document.fonts) for (const f of document.fonts) if (f.status === 'loaded') n++; return n; };
+        this.loaded = loaded();
+        this.poll = setInterval(() => {
+            if (document.visibilityState !== 'visible') return;
+            const n = loaded();
+            if (n !== this.loaded) { this.loaded = n; this.again(); }
+        }, 1000);
         view.dom.addEventListener('compositionend', () => this.schedule(true));
         Layout.current = this;
         this.schedule(true);
     }
-    destroy() { window.removeEventListener('resize', this.onResize); cancelAnimationFrame(this.frame); }
+    destroy() { window.removeEventListener('resize', this.onResize); cancelAnimationFrame(this.frame); clearTimeout(this.checkTimer); clearInterval(this.poll); }
+    // two-column text whose letters do not fit in its two lines (measured while a font was still loading): measured again, a few times
+    check() {
+        const rng = document.createRange();
+        const over = [...this.view.dom.querySelectorAll('.seg')].some(s => {
+            rng.selectNodeContents(s);
+            const c = rng.getBoundingClientRect(), b = s.getBoundingClientRect(), v = !!s.closest('.grp.v');
+            return v ? c.width > b.width + 2 : c.height > b.height + 2;
+        });
+        if (!over) { this.retries = 0; return; }
+        if (this.retries++ < 6) this.again();
+    }
     schedule(fresh) {
         if (fresh) this.passes = 0;
-        if (!this.frame) this.frame = requestAnimationFrame(() => { this.frame = 0; this.run(); });
+        if (!this.frame) this.frame = requestAnimationFrame(() => {
+            this.frame = 0; this.run();
+            clearTimeout(this.checkTimer); this.checkTimer = setTimeout(() => this.check(), 500 * (this.retries + 1));
+        });
     }
     run() {
         const view = this.view;
