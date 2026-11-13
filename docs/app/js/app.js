@@ -7,7 +7,7 @@ window.notesApp = { store, ready, flush() } is for the tests.
 (() => {
   const $ = id => document.getElementById(id);
   const parser = new VietnameseParser('qatt');   // for the search in the readings of QATT cells
-  const state = { store: null, docs: [], current: null, inStore: false, dirty: false };
+  const state = { store: null, docs: [], current: null, shared: false, inStore: false, dirty: false };
   const app = window.notesApp = { store: null, ready: false, flush: () => save() };
   let saveTimer = null, snackTimer = null, deleted = null, persistAsked = false;
   const newId = () => (crypto.randomUUID ? crypto.randomUUID() : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => { const r = Math.random() * 16 | 0; return (c === 'x' ? r : (r & 3 | 8)).toString(16); }));
@@ -71,7 +71,7 @@ window.notesApp = { store, ready, flush() } is for the tests.
   function save() {
     clearTimeout(saveTimer); saveTimer = null;
     const doc = state.current;
-    if (!doc || !state.dirty) return saving;
+    if (!doc || !state.dirty || state.shared) return saving;
     state.dirty = false;
     const text = NomEditor.text();
     if (!/\S/.test(text) && !doc.title && !state.inStore) return saving;   // a new document that stays empty
@@ -114,7 +114,7 @@ window.notesApp = { store, ready, flush() } is for the tests.
   if (window.VietIme) new VietIme(titleInput, { telex: true, candidates: false });
   function editTitle(on, commit) {
     if (on) {
-      if (!state.current) return;
+      if (!state.current || state.shared) return;
       titleInput.value = DocsCore.title(NomEditor.text(), state.current.title);
       $('editor-title').hidden = true; titleInput.hidden = false; titleInput.focus(); titleInput.select();
       return;
@@ -146,7 +146,7 @@ window.notesApp = { store, ready, flush() } is for the tests.
   $('edit-btn').addEventListener('click', () => { setEditing(true, true); NomEditor.focus(); });
   let lastTap = { t: 0, x: 0, y: 0 };
   $('field').addEventListener('pointerup', e => {   // a double tap in the reading view starts editing there (dblclick is not sent on every phone)
-    if (NomEditor.editable) return;
+    if (NomEditor.editable || state.shared) return;
     if (e.timeStamp - lastTap.t < 350 && Math.hypot(e.clientX - lastTap.x, e.clientY - lastTap.y) < 30) {
       lastTap.t = 0;
       setEditing(true, true);
@@ -156,7 +156,8 @@ window.notesApp = { store, ready, flush() } is for the tests.
     } else lastTap = { t: e.timeStamp, x: e.clientX, y: e.clientY };
   });
 
-  function showEditor(doc, fresh) {
+  function showEditor(doc, fresh, shared) {
+    state.shared = !!shared; $('view-editor').classList.toggle('shared', !!shared); $('keep-btn').hidden = !shared;
     state.current = doc; state.inStore = !fresh; state.dirty = false;
     closeMenu();
     $('view-list').hidden = true;
@@ -171,7 +172,7 @@ window.notesApp = { store, ready, flush() } is for the tests.
   }
   async function showList() {
     await save();
-    state.current = null;
+    state.current = null; state.shared = false;
     closeMenu();
     NomEditor.setEditable(false);
     $('view-editor').hidden = true;
@@ -179,6 +180,8 @@ window.notesApp = { store, ready, flush() } is for the tests.
     renderList();
   }
   async function route() {
+    const sm = /^#\/s\/([\w-]+)$/.exec(location.hash);
+    if (sm) return showShared(sm[1]);
     const m = /^#\/n\/(.+)$/.exec(location.hash);
     if (!m) return showList();
     const id = decodeURIComponent(m[1]);
@@ -188,6 +191,59 @@ window.notesApp = { store, ready, flush() } is for the tests.
     if (!doc) { history.replaceState(null, '', '#/'); return showList(); }
     showEditor({ ...doc }, false);
   }
+  // a link of somebody: the document is loaded by its code and shown for reading; the owner of it goes to his own document
+  async function showShared(code) {
+    if (state.shared && state.current && state.shared === code) return;
+    await save();
+    let doc = null;
+    try { doc = await DocsSync.shareGet(code); } catch (e) { console.error('Share failed:', e); }
+    if (!doc) { snack('This link is not valid (any more)', 'Liên kết này không (còn) hiệu lực'); history.replaceState(null, '', '#/'); return showList(); }
+    if (state.docs.some(d => d.id === doc.id)) { history.replaceState(null, '', '#/n/' + encodeURIComponent(doc.id)); return route(); }
+    showEditor(doc, false, true);
+    state.shared = code;
+  }
+  $('keep-btn').addEventListener('click', async () => {   // a copy in my notes
+    const src = state.current; if (!src || !state.shared) return;
+    const now = Date.now(), doc = { ...src, id: newId(), created: now, updated: now, synced: 0 };
+    try { await state.store.put(doc); } catch (e) { warnUnsaved(); return; }
+    state.docs.push(doc); syncSoon();
+    state.shared = false; history.replaceState({ fromList: true }, '', '#/n/' + encodeURIComponent(doc.id));
+    await route();
+    snack('Added to your notes', 'Đã thêm vào ghi chú của bạn');
+  });
+
+  // ----- sharing: the link goes to an Edge Function that gives social media the title and the text, then opens the app -----
+  const SHARE_URL = code => 'https://kfgqhhmdzboszpwsqkxt.supabase.co/functions/v1/share?c=' + code;
+  let shareState = null;   // { id, code } of the open document
+  async function openShareMenu() {
+    const doc = state.current;
+    if (!DocsSync.user) { closeMenu(); snack('Sign in to share', 'Đăng nhập để chia sẻ'); return; }
+    shareState = { id: doc.id, code: null };
+    $('share-end').hidden = true;
+    try { shareState.code = await DocsSync.shareCode(doc.id); } catch (e) { /* not shared yet, or offline */ }
+    $('share-end').hidden = !shareState.code;
+  }
+  $('share-btn').addEventListener('click', () => setTimeout(() => { if (!$('share-menu').hidden) openShareMenu(); }));   // after the menu code has opened it
+  $('share-link').addEventListener('click', async () => {
+    closeMenu();
+    const doc = state.current; if (!doc || !DocsSync.user) return;
+    let code = shareState && shareState.id === doc.id ? shareState.code : null;
+    try {
+      if (!code) {
+        await sync();   // the document must be in the account
+        code = await DocsSync.shareCode(doc.id) || await DocsSync.shareCreate(doc.id);
+      }
+    } catch (e) { console.error('Share failed:', e); snack('Could not create the link (offline?)', 'Không tạo được liên kết (đang ngoại tuyến?)'); return; }
+    const url = SHARE_URL(code), title = DocsCore.title(NomEditor.text(), doc.title);
+    if (navigator.share) { try { await navigator.share({ title, url }); return; } catch (e) { if (e && e.name === 'AbortError') return; } }
+    try { await navigator.clipboard.writeText(url); snack('Link copied', 'Đã sao chép liên kết'); } catch (e) { prompt('Link', url); }
+  });
+  $('share-end').addEventListener('click', async () => {
+    closeMenu();
+    const doc = state.current; if (!doc) return;
+    try { await DocsSync.shareEnd(doc.id); shareState = null; snack('The link has been stopped', 'Đã dừng chia sẻ liên kết'); }
+    catch (e) { console.error('Stop failed:', e); snack('Could not stop the link (offline?)', 'Không dừng được liên kết (đang ngoại tuyến?)'); }
+  });
   window.addEventListener('popstate', async () => {
     if (NomEditor.editable && !(history.state && history.state.edit) && /^#\/n\//.test(location.hash)) { stopEditing(); return; }
     route();
@@ -294,7 +350,7 @@ window.notesApp = { store, ready, flush() } is for the tests.
   if (vv) { vv.addEventListener('resize', fitKeyboard); vv.addEventListener('scroll', fitKeyboard); }
 
   // ----- menus -----
-  const MENUS = [['menu-btn', 'menu'], ['list-menu-btn', 'list-menu'], ['style-btn', 'style-menu'], ['size-btn', 'size-menu']];
+  const MENUS = [['menu-btn', 'menu'], ['list-menu-btn', 'list-menu'], ['style-btn', 'style-menu'], ['size-btn', 'size-menu'], ['share-btn', 'share-menu']];
   function closeMenu() { for (const [button, menu] of MENUS) { $(menu).hidden = true; $(button).setAttribute('aria-expanded', 'false'); } }
   for (const [button, menu] of MENUS) $(button).addEventListener('click', e => {
     e.stopPropagation();
@@ -353,7 +409,7 @@ window.notesApp = { store, ready, flush() } is for the tests.
   const FONTS = qattFontsShown();   // js/fonts.js decides which fonts this visitor has; its default is the default here
   const FORMAT_DEFAULTS = { font: (FONTS.find(f => f.default) || FONTS[0]).family, size: 100, decoding: 'qatt' };
   const formatOf = doc => ({ ...FORMAT_DEFAULTS, ...(doc && doc.format && typeof doc.format === 'object' ? doc.format : {}) });
-  const keepFormat = (key, value) => { const doc = state.current; if (!doc) return; doc.format = { ...(doc.format || {}), [key]: value }; if (value === FORMAT_DEFAULTS[key]) delete doc.format[key]; schedule(); };
+  const keepFormat = (key, value) => { const doc = state.current; if (!doc || state.shared) return; doc.format = { ...(doc.format || {}), [key]: value }; if (value === FORMAT_DEFAULTS[key]) delete doc.format[key]; schedule(); };
   // the font with its Latin, the PA behind it, then the Chữ Nôm fonts of the Chunom site (js/fonts.js)
   const fontStack = family => [typeof qattFieldFont === 'function' ? qattFieldFont(family) : `"${family}"`, ...paFontStack(family).map(f => `"${f}"`)].join(', ');
   const setFont = (family, user) => {
