@@ -427,7 +427,9 @@ window.notesApp = { store, ready, flush() } is for the tests.
   const formatOf = doc => ({ ...FORMAT_DEFAULTS, ...(doc && doc.format && typeof doc.format === 'object' ? doc.format : {}) });
   const keepFormat = (key, value) => { const doc = state.current; if (!doc || state.shared) return; doc.format = { ...(doc.format || {}), [key]: value }; if (value === FORMAT_DEFAULTS[key]) delete doc.format[key]; schedule(); };
   // the font with its Latin, the PA behind it, then the Chữ Nôm fonts of the Chunom site (js/fonts.js)
-  const fontStack = family => [typeof qattFieldFont === 'function' ? qattFieldFont(family) : `"${family}"`, ...paFontStack(family).map(f => `"${f}"`)].join(', ');
+  // and QATT Pen behind them: the Chữ Nôm of a font without its own (Serif, Celluloid B, …) and the characters a font lacks come from Pen, not from a font of the phone
+  const PEN = (FONTS.find(f => f.default) || { family: 'QATT Pen' }).family;
+  const fontStack = family => [typeof qattFieldFont === 'function' ? qattFieldFont(family) : `"${family}"`, ...paFontStack(family).map(f => `"${f}"`), ...(family === PEN ? [] : [`"${PEN}"`])].join(', ');
   const setFont = (family, user) => {
     if (typeof QATT_FONT_RENAMED !== 'undefined' && QATT_FONT_RENAMED[family]) family = QATT_FONT_RENAMED[family];
     if (!FONTS.some(f => f.family === family)) family = FORMAT_DEFAULTS.font;
@@ -475,11 +477,11 @@ window.notesApp = { store, ready, flush() } is for the tests.
     $('set-style').append(b);
   }
 
-  // the size: 100% is 22 pixels (the size of Scrolls); the grid of the vertical pages follows it
+  // the size: 100% is 32 pixels (about the 150% of the first versions, 22 px); the grid of the vertical pages follows it
   const setSize = (value, user) => {
     value = Math.min(300, Math.max(50, Number(value) || 100));
     $('set-size').value = $('read-zoom').value = value; $('size-label').textContent = $('size-btn-label').textContent = value + '%';
-    document.documentElement.style.setProperty('--doc-size', Math.round(value * 0.22) + 'px');
+    document.documentElement.style.setProperty('--doc-size', Math.round(value * 0.32) + 'px');
     if (user) keepFormat('size', value);
     NomEditor.relayout();
   };
