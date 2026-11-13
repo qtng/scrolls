@@ -423,7 +423,7 @@ window.notesApp = { store, ready, flush() } is for the tests.
 
   // ----- font, style, size, table: they belong to the document (doc.format: only what differs from the defaults) -----
   const FONTS = qattFontsShown();   // js/fonts.js decides which fonts this visitor has; its default is the default here
-  const FORMAT_DEFAULTS = { font: (FONTS.find(f => f.default) || FONTS[0]).family, size: 100, decoding: 'qatt' };
+  const FORMAT_DEFAULTS = { font: (FONTS.find(f => f.default) || FONTS[0]).family, fontSize: 100, decoding: 'qatt' };
   const formatOf = doc => ({ ...FORMAT_DEFAULTS, ...(doc && doc.format && typeof doc.format === 'object' ? doc.format : {}) });
   const keepFormat = (key, value) => { const doc = state.current; if (!doc || state.shared) return; doc.format = { ...(doc.format || {}), [key]: value }; if (value === FORMAT_DEFAULTS[key]) delete doc.format[key]; schedule(); };
   // the font with its Latin, the PA behind it, then the Chữ Nôm fonts of the Chunom site (js/fonts.js)
@@ -485,19 +485,25 @@ window.notesApp = { store, ready, flush() } is for the tests.
   const room = () => { const f = $('field'), cs = getComputedStyle(f); return Math.max(160, f.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight)); };
   const MAX_CHARS = 23;
   const pageWidth = () => Math.min(MAX_CHARS, Math.round(room() / BASE * 10) / 10);   // in characters of 32 px, at most 23
+  // Two sizes: the zoom (reading only, the slider of the title bar, not kept) scales the page and its text together; the font size of the
+  // document (editing, format.fontSize in %, kept and synced) scales only the text in its page of fixed width, so that more or less fits on a page.
+  // The unit (--unit) is the size of a character of 100%: the page is format.width units wide, the text is fontSize % of a unit. (Later a size of
+  // a paragraph or a character can be relative to the text of the document, in em.)
   let zoom = 100;
   function applySize() {
     const doc = state.current, w = doc && doc.format && doc.format.width > 0 ? doc.format.width : pageWidth();
     // the document fills the width of the screen: smaller where it does not fit, larger where there is room, but at most twice its size
-    const fit = Math.min(2, room() / (w * BASE));
+    const fit = Math.min(2, room() / (w * BASE)), unit = BASE * fit * zoom / 100, scale = formatOf(doc).fontSize / 100;
     document.documentElement.style.setProperty('--page-em', String(w));
-    document.documentElement.style.setProperty('--doc-size', (BASE * fit * zoom / 100).toFixed(2) + 'px');
+    document.documentElement.style.setProperty('--unit', unit.toFixed(2) + 'px');
+    document.documentElement.style.setProperty('--doc-size', (unit * scale).toFixed(2) + 'px');
     NomEditor.relayout();
   }
-  const setSize = (value, user) => {
-    zoom = Math.min(300, Math.max(50, Math.round((Number(value) || 100) / 25) * 25));   // in steps of 25%
-    $('set-size').value = $('read-zoom').value = zoom; $('size-label').textContent = $('size-btn-label').textContent = zoom + '%';
-    // the middle of what is seen stays where it is (a page wider than the screen scrolls sideways); a vertical page begins at its right edge
+  const step25 = (v, lo, hi) => Math.min(hi, Math.max(lo, Math.round((Number(v) || 100) / 25) * 25));
+  // the zoom: the middle of what is seen stays where it is (a page wider than the screen scrolls sideways); a vertical page begins at its right edge
+  const setZoom = (value, user) => {
+    zoom = step25(value, 50, 300);
+    $('read-zoom').value = zoom;
     const f = $('field'), cx = user && f.scrollWidth > f.clientWidth ? (f.scrollLeft + f.clientWidth / 2) / f.scrollWidth : null;
     const cy = user ? (f.scrollTop + f.clientHeight / 2) / Math.max(1, f.scrollHeight) : null;
     applySize();
@@ -507,8 +513,15 @@ window.notesApp = { store, ready, flush() } is for the tests.
       if (cy !== null) f.scrollTop = cy * f.scrollHeight - f.clientHeight / 2;
     }));
   };
-  $('set-size').addEventListener('input', () => setSize($('set-size').value, true));
-  $('read-zoom').addEventListener('input', () => setSize($('read-zoom').value, true));
+  // the font size of the document
+  const setFontSize = (value, user) => {
+    const v = step25(value, 25, 400);
+    $('set-size').value = v; $('size-label').textContent = $('size-btn-label').textContent = v + '%';
+    if (user) keepFormat('fontSize', v);
+    applySize();
+  };
+  $('set-size').addEventListener('input', () => setFontSize($('set-size').value, true));
+  $('read-zoom').addEventListener('input', () => setZoom($('read-zoom').value, true));
   window.addEventListener('resize', () => { if (state.current) applySize(); });
   // a document without a width (a new one, or one of before): the width of this screen, kept in the document (not for a shared one)
   function fixWidth(doc) {
@@ -533,7 +546,7 @@ window.notesApp = { store, ready, flush() } is for the tests.
   function applyFormat(doc) {
     const f = formatOf(doc);
     fixWidth(doc);
-    setFont(f.font); setSize(100); useDecoding(f.decoding);
+    setFont(f.font); setFontSize(f.fontSize); setZoom(100); useDecoding(f.decoding);
   }
 
   // ----- delete and undo -----
