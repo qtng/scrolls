@@ -359,13 +359,15 @@ const UI = {
             return b;
         };
         const icon = c => el('i', { className: 'fa-solid ' + c });
+        // two-column text: one line of big characters with two small lines between them
+        const wariIcon = () => { const w = el('span', { className: 'wari-icon' }); w.innerHTML = '<svg viewBox="0 0 16 16" width="1.15em" height="1.15em" fill="none" stroke="currentColor" stroke-linecap="round"><path d="M1.5 8h3M11.5 8h3" stroke-width="2.2"/><path d="M6 5.2h4M6 10.8h4" stroke-width="1.5"/></svg>'; return w; };
         const hIcon = n => el('span', { className: 'h-icon' }, icon('fa-heading'), el('sub', {}, String(n)));
         const sep = () => el('span', { className: 'sep' });
         const cmd = c => () => c(this.view.state, this.view.dispatch, this.view);
 
         this.bH1 = btn(hIcon(1), 'Heading', 'Tiêu đề', cmd(setHeading(1)));
         this.bH2 = btn(hIcon(2), 'Subheading', 'Tiêu đề phụ', cmd(setHeading(2)));
-        this.bWari = btn(icon('fa-table-columns'), 'Two-column text', 'Chữ hai dòng', cmd(toggleWari));
+        this.bWari = btn(wariIcon(), 'Two-column text', 'Chữ hai dòng', cmd(toggleWari));
         this.bRuby = btn(icon('fa-superscript'), 'Ruby (reading)', 'Chú âm', () => RubyBox.open());
         this.bH = btn(icon('fa-grip-lines'), 'Horizontal section', 'Phần ngang', () => this.setSection({ dir: 'h' }));
         this.bV = btn(icon('fa-grip-lines-vertical'), 'Vertical section', 'Phần dọc', () => this.setSection({ dir: 'v' }));
