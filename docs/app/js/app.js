@@ -510,10 +510,12 @@ window.notesApp = { store, ready, flush() } is for the tests.
     const ax = at ? at.x - r.left : f.clientWidth / 2, ay = at ? at.y - r.top : f.clientHeight / 2;
     const rx = (f.scrollLeft + ax) / Math.max(1, f.scrollWidth), ry = (f.scrollTop + ay) / Math.max(1, f.scrollHeight);
     applySize();
-    requestAnimationFrame(() => requestAnimationFrame(() => {
+    const place = () => {
       if (user) { f.scrollLeft = rx * f.scrollWidth - ax; f.scrollTop = ry * f.scrollHeight - ay; }
       else if (f.querySelector('.grp.v')) f.scrollLeft = f.scrollWidth;
-    }));
+    };
+    place();   // at once (the new sizes are laid out when they are read), and again when the layout of the pages is done
+    requestAnimationFrame(() => requestAnimationFrame(place));
   };
   // pinch with two fingers on the document (reading), Ctrl + wheel or a pinch on a touchpad: the zoom (the zoom of the browser stays off: it would
   // also enlarge the bars)
@@ -523,13 +525,36 @@ window.notesApp = { store, ready, flush() } is for the tests.
     const later = (value, at) => { next = { value, at }; if (!frame) frame = requestAnimationFrame(() => { frame = 0; setZoom(next.value, true, next.at); }); };
     const spread = t => Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
     const mid = t => ({ x: (t[0].clientX + t[1].clientX) / 2, y: (t[0].clientY + t[1].clientY) / 2 });
-    field.addEventListener('touchstart', e => { if (e.touches.length === 2 && reading()) pinch = { d: spread(e.touches), z: zoom }; }, { passive: true });
+    // while the fingers move the title and the pages are only scaled (a transform: no layout, nothing moves); at the end the zoom is set once
+    const parts = () => [field.querySelector('.doc-head'), $('editor')];
+    const scaleBy = (s, at) => parts().forEach(el => {
+      if (s === 1) { el.style.transform = ''; el.style.transformOrigin = ''; return; }
+      const r = el.getBoundingClientRect();
+      el.style.transformOrigin = `${at.x - r.left}px ${at.y - r.top}px`;
+      el.style.transform = `scale(${s})`;
+    });
+    field.addEventListener('touchstart', e => {
+      if (e.touches.length !== 2 || !reading()) return;
+      pinch = { d: spread(e.touches), z: zoom, at: mid(e.touches), s: 1 };
+      parts().forEach(el => { el.style.willChange = 'transform'; });
+    }, { passive: true });
     field.addEventListener('touchmove', e => {
       if (!pinch || e.touches.length !== 2) return;
       e.preventDefault();
-      later(pinch.z * spread(e.touches) / pinch.d, mid(e.touches));
+      const z = Math.min(300, Math.max(50, pinch.z * spread(e.touches) / pinch.d));
+      pinch.s = z / pinch.z;
+      if (!frame) frame = requestAnimationFrame(() => { frame = 0; if (pinch) scaleBy(pinch.s, pinch.at); });
     }, { passive: false });
-    field.addEventListener('touchend', e => { if (e.touches.length < 2) pinch = null; });
+    const endPinch = () => {
+      if (!pinch) return;
+      const { z, s, at } = pinch;
+      pinch = null;
+      cancelAnimationFrame(frame); frame = 0;
+      parts().forEach(el => { el.style.transform = ''; el.style.transformOrigin = ''; el.style.willChange = ''; });
+      if (s !== 1) setZoom(z * s, true, at);
+    };
+    field.addEventListener('touchend', e => { if (e.touches.length < 2) endPinch(); });
+    field.addEventListener('touchcancel', endPinch);
     field.addEventListener('wheel', e => {
       if (!e.ctrlKey || !reading()) return;
       e.preventDefault();
