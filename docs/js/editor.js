@@ -9,7 +9,8 @@ out as segments (inline decorations), the bands of vertical sections get their h
 (() => {
 'use strict';
 const { Schema, EditorState, EditorView, Plugin, PluginKey, TextSelection, Decoration, DecorationSet, keymap, history, undo, redo,
-        baseKeymap, toggleMark, setBlockType, chainCommands, dropCursor } = PM;
+        baseKeymap, toggleMark, setBlockType, dropCursor, Fragment, Slice } = PM;
+const QATT = 'https://qatt.org';
 
 const T = (en, vi) => (window.Lang ? Lang.t(en, vi) : en);
 const MIN_COLS = 2, MAX_COLS = 40, DEFAULT_COLS = 10;
@@ -40,7 +41,15 @@ const schema = new Schema({
         text: { group: 'inline' },
     },
     marks: {
-        warichu: { parseDOM: [{ tag: 'span.wari' }], toDOM: () => ['span', { class: 'wari' }, 0] },
+        warichu: { excludes: 'warichu ruby', parseDOM: [{ tag: 'span.wari' }], toDOM: () => ['span', { class: 'wari' }, 0] },
+        // ruby: rt = the text shown (Quốc Ngữ, PA or QATT), qn = the reading in Quốc Ngữ (to edit it again), side = over (vertical: right) or under (left)
+        ruby: {
+            attrs: { rt: { default: '' }, qn: { default: '' }, side: { default: 'over' } },
+            inclusive: false,
+            excludes: 'ruby warichu',
+            parseDOM: [{ tag: 'span.rb', contentElement: '.rb-b', getAttrs: d => ({ rt: d.getAttribute('data-rt') || '', qn: d.getAttribute('data-qn') || '', side: d.getAttribute('data-side') === 'under' ? 'under' : 'over' }) }],
+            toDOM: m => ['span', { class: 'rb', 'data-rt': m.attrs.rt, 'data-qn': m.attrs.qn, 'data-side': m.attrs.side }, ['span', { class: 'rb-b' }, 0], ['span', { class: 'rt', contenteditable: 'false' }, m.attrs.rt]],
+        },
     },
 });
 const S = schema.nodes;
@@ -90,6 +99,7 @@ const setHeading = level => (state, dispatch) => {
     return on ? setBlockType(S.paragraph)(state, dispatch) : setBlockType(S.heading, { level })(state, dispatch);
 };
 const toggleWari = toggleMark(schema.marks.warichu);
+const openRuby = () => { RubyBox.open(); return true; };
 
 // the empty paragraph with the caret becomes a section of its own (dir); the text before and after keeps the old section and its settings
 function insertSection(view, dir) {
@@ -156,6 +166,9 @@ const layoutPlugin = new Plugin({
             return layoutKey.getState(state).add(state.doc, marks);
         },
         nodeViews: { section: node => new SectionView(node) },
+        markViews: { ruby: mark => rubyView(mark) },
+        // text with the annotation of the QATT fonts (CJK, U+F00B0 over / U+F00B1 under, a PA syllable) becomes ruby
+        transformPasted: slice => new Slice(annotToRuby(slice.content), slice.openStart, slice.openEnd),
     },
     view(view) {
         const layout = new Layout(view);
@@ -227,35 +240,96 @@ class Layout {
             const bands = Math.max(1, Math.floor((bottom - top - 1) / inf.pitch) + 1);
             sec.style.height = (bands * inf.pitch - inf.gap) + 'px';
         }
+        // ruby longer than its base is narrowed (the base keeps its cell)
+        for (const rb of view.dom.querySelectorAll('.rb')) {
+            const base = rb.firstElementChild, rt = rb.lastElementChild;
+            if (!base || !rt || !rt.textContent) continue;
+            const v = !!rb.closest('.sec.v'), r = base.getBoundingClientRect();
+            const baseLen = v ? r.height : r.width, rtLen = v ? rt.offsetHeight : rt.offsetWidth;
+            const allowed = baseLen + 0.2 * parseFloat(getComputedStyle(base).fontSize);
+            const scale = rtLen > allowed ? (allowed / rtLen).toFixed(3) : '1';
+            if (rt.style.getPropertyValue('--rs') !== scale) rt.style.setProperty('--rs', scale);
+        }
         UI.refresh();
     }
 }
 
-// The segments of a run of two-column text (chars: code points). The grid of the old prints: it takes whole cells; the first segment fills
-// the rest of the column, the next ones whole columns, the last one is balanced (the right line gets the extra character); half a cell left over stays empty.
-// from/to are offsets in UTF-16 units from the start of the run.
-function segments(chars, offset, len, half) {
-    const cell = 2 * half, tol = half * 0.05;
-    let startPad = Math.ceil((offset - tol) / cell) * cell - offset;
-    if (startPad < tol) startPad = 0;
-    const fit = px => Math.floor((px + tol) / half);
-    let perLine = fit(len - offset - startPad);
-    if (perLine < 1) { perLine = fit(len); startPad = 0; }
-    const full = Math.max(1, fit(len));
+// ---------------------------------------------------------------- ruby
+function rubyView(mark) {
+    const dom = el('span', { className: 'rb' }), contentDOM = el('span', { className: 'rb-b' }), rt = el('span', { className: 'rt', textContent: mark.attrs.rt });
+    dom.dataset.side = mark.attrs.side;
+    rt.contentEditable = 'false';
+    dom.append(contentDOM, rt);
+    return { dom, contentDOM, ignoreMutation: m => m.type !== 'selection' && !contentDOM.contains(m.target) };
+}
+
+// the scripts of a reading: Quốc Ngữ as it is, PA and QATT from parser.js, pa-text.js, qatt-text.js of qatt.org (loaded when first needed)
+const Scripts = {
+    KINDS: [['qn', 'QN'], ['pa', 'PA'], ['qatt', 'QATT']],
+    ready: null, parser: null,
+    load() {
+        const js = (name, has) => has() ? Promise.resolve() : new Promise((ok, fail) => {
+            const sc = el('script', { src: `${QATT}/js/${name}` }); sc.onload = ok; sc.onerror = () => fail(new Error(name)); document.head.append(sc);
+        });
+        return this.ready || (this.ready = js('parser.js', () => typeof VietnameseParser !== 'undefined')
+            .then(() => Promise.all([js('pa-text.js', () => typeof PaText !== 'undefined'), js('qatt-text.js', () => typeof QattText !== 'undefined')]))
+            .then(() => { this.parser = new VietnameseParser('qatt'); })
+            .catch(e => { console.error('The scripts of the readings could not be loaded:', e); this.ready = null; }));
+    },
+    text(qn, kind) {
+        if (kind === 'qn' || !this.parser) return qn;
+        const f = kind === 'pa' ? PaText.word : QattText.word;
+        return qn.replace(/[\p{L}\p{M}]+/gu, w => f(w.toLowerCase(), this.parser) || w);
+    },
+    // the reading in Quốc Ngữ of a PA text (for ruby pasted with the annotation of the fonts)
+    fromPa(pa) { return this.parser && typeof PaText !== 'undefined' ? PaText.read(pa, this.parser) : ''; },
+};
+
+// the readings of a character or word in the dictionaries of ime.js, in Quốc Ngữ
+async function readingsOf(text) {
+    if (!window.VietIme || !text) return [];
+    try { await VietIme.load(); } catch (e) { return []; }
+    const seen = new Set();
+    for (const e of VietIme.lookupGlyph(text)) if (e.glyph === text && e.reading) seen.add(e.reading);
+    return [...seen];
+}
+
+// text with the annotation of the QATT fonts: a character, U+F00B0 (over) or U+F00B1 (under), a PA syllable, maybe U+F00B2 (end)
+const ANNOT = /(\P{M})([\u{F00B0}\u{F00B1}])([\u{F00D0}-\u{F010E}]+)\u{F00B2}?/gu;
+function annotToRuby(fragment) {
     const out = [];
-    let i = 0, u = 0, cap = 2 * Math.max(1, perLine);
-    while (i < chars.length) {
-        const take = Math.min(cap, chars.length - i);
-        const units = chars.slice(i, i + take).join('').length;
-        const line = Math.ceil(take / 2);
-        let style = `inline-size: ${line}em;`;
-        if (line % 2) style += ' padding-inline-end: 1em;';
-        if (!out.length && startPad) style += ` margin-inline-start: ${startPad.toFixed(2)}px;`;
-        out.push({ from: u, to: u + units, style });
-        i += take; u += units;
-        cap = 2 * full;
-    }
-    return out;
+    fragment.forEach(node => {
+        if (!node.isText) { out.push(node.isLeaf ? node : node.copy(annotToRuby(node.content))); return; }
+        const text = node.text;
+        let last = 0, m;
+        ANNOT.lastIndex = 0;
+        while ((m = ANNOT.exec(text))) {
+            if (m.index > last) out.push(schema.text(text.slice(last, m.index), node.marks));
+            const mark = schema.marks.ruby.create({ rt: m[3], qn: Scripts.fromPa(m[3]), side: m[2] === '\u{F00B1}' ? 'under' : 'over' });
+            out.push(schema.text(m[1], mark.addToSet(node.marks)));
+            last = m.index + m[0].length;
+        }
+        if (!last) out.push(node);
+        else if (last < text.length) out.push(schema.text(text.slice(last), node.marks));
+    });
+    return Fragment.fromArray(out);
+}
+
+// the ruby mark at a position (the character after it, else the one before) and the range it covers in its block
+function rubyAt(state, pos) {
+    const $pos = state.doc.resolve(pos), type = schema.marks.ruby;
+    const after = $pos.nodeAfter, before = $pos.nodeBefore;
+    const mark = (after && type.isInSet(after.marks)) || (before && type.isInSet(before.marks));
+    if (!mark) return null;
+    const start = $pos.start();
+    let found = null, cur = null;
+    $pos.parent.forEach((child, offset) => {
+        const a = start + offset, b = a + child.nodeSize;
+        if (!mark.isInSet(child.marks)) { cur = null; return; }
+        if (cur && cur.to === a) cur.to = b; else cur = { from: a, to: b };
+        if (cur.from <= pos && pos <= cur.to) found = { mark, from: cur.from, to: cur.to };
+    });
+    return found;
 }
 
 // ---------------------------------------------------------------- placeholder
@@ -288,7 +362,8 @@ const UI = {
         this.bH1 = btn('H1', 'Heading', 'Tiêu đề', cmd(setHeading(1)));
         this.bH2 = btn('H2', 'Subheading', 'Tiêu đề phụ', cmd(setHeading(2)));
         this.bWari = btn(el('span', { className: 'han-btn', textContent: '雙' }), 'Two-column text', 'Chữ hai dòng', cmd(toggleWari));
-        this.bubble = el('div', { className: 'scroll-ui', hidden: true }, this.bH1, this.bH2, el('span', { className: 'sep' }), this.bWari);
+        this.bRuby = btn(el('span', { className: 'han-btn', textContent: '注' }), 'Ruby (reading)', 'Chú âm', () => RubyBox.open());
+        this.bubble = el('div', { className: 'scroll-ui', hidden: true }, this.bH1, this.bH2, el('span', { className: 'sep' }), this.bWari, this.bRuby);
 
         // the plus on an empty line: a new section
         this.plus = el('button', { type: 'button', className: 'scroll-plus', hidden: true });
@@ -332,14 +407,17 @@ const UI = {
         const { state } = view, sel = state.selection, focused = view.hasFocus();
         const show = (box, on) => { box.hidden = !on; return on; };
 
-        // bubble
-        if (show(this.bubble, focused && !sel.empty && sel instanceof TextSelection)) {
+        // bubble: over a selection, or with the caret in a ruby (to edit it)
+        const inRuby = sel.empty && rubyAt(state, sel.from);
+        if (show(this.bubble, focused && !RubyBox.isOpen() && sel instanceof TextSelection && (!sel.empty || !!inRuby))) {
             const a = view.coordsAtPos(sel.from), b = view.coordsAtPos(sel.to);
             const p = sel.$from.parent;
             this.bH1.classList.toggle('on', p.type === S.heading && p.attrs.level === 1);
             this.bH2.classList.toggle('on', p.type === S.heading && p.attrs.level === 2);
             const wari = schema.marks.warichu;
             this.bWari.classList.toggle('on', state.doc.rangeHasMark(sel.from, sel.to, wari));
+            this.bRuby.classList.toggle('on', !!inRuby || state.doc.rangeHasMark(sel.from, sel.to, schema.marks.ruby));
+            this.bRuby.disabled = !sel.empty && (sel.$from.parent !== sel.$to.parent || state.doc.rangeHasMark(sel.from, sel.to, wari));
             const top = Math.min(a.top, b.top) - this.bubble.offsetHeight - 8;
             this.place(this.bubble, (Math.min(a.left, b.left) + Math.max(a.right, b.right)) / 2 - this.bubble.offsetWidth / 2, top < 8 ? Math.max(a.bottom, b.bottom) + 8 : top);
         }
@@ -361,7 +439,7 @@ const UI = {
         }
 
         // section tools
-        if (show(this.tools, focused && sel.empty && sel.$from.depth >= 1)) {
+        if (show(this.tools, focused && sel.empty && !inRuby && sel.$from.depth >= 1)) {
             const sec = sectionAt(sel.$from), dom = view.nodeDOM(sec.pos);
             const a = sec.node.attrs;
             this.bH.classList.toggle('on', a.dir === 'h');
@@ -401,6 +479,149 @@ const UI = {
         view.dispatch(tr.scrollIntoView());
     },
 };
+// the box to write a ruby: a field (Quốc Ngữ, with Telex), the readings of the dictionary, the script (QN, PA, QATT), the side, each character
+const RubyBox = {
+    view: null, range: null, kind: 'qn', side: 'over',
+    init(view) {
+        this.view = view;
+        try { this.kind = localStorage.getItem('scrollsRubyKind') || (window.Readings && Readings.shown && Readings.shown()[0]) || 'qn'; } catch (e) { /* default */ }
+        if (!Scripts.KINDS.some(k => k[0] === this.kind)) this.kind = 'qn';
+        const btn = (content, en, viText, run, cls = '') => {
+            const b = el('button', { type: 'button', className: cls });
+            b.append(content);
+            titled(b, en, viText);
+            b.addEventListener('click', run);
+            return b;
+        };
+        this.input = el('input', { type: 'text', className: 'form-control form-control-sm rt-input', autocomplete: 'off' });
+        this.input.placeholder = 'Reading';
+        this.input.setAttribute('data-vi-placeholder', 'Cách đọc');
+        this.input.addEventListener('keydown', e => {
+            if (e.key === 'Enter' && !(this.ime && this.ime.visible)) { e.preventDefault(); this.apply(this.input.value); }
+            else if (e.key === 'Escape' && !(this.ime && this.ime.visible)) { e.preventDefault(); this.close(true); }
+        });
+        this.input.addEventListener('input', () => this.preview());
+        this.ok = btn(el('i', { className: 'bi bi-check-lg' }), 'Apply', 'Áp dụng', () => this.apply(this.input.value));
+        this.del = btn(el('i', { className: 'bi bi-trash' }), 'Remove the ruby', 'Bỏ chú âm', () => this.apply(''));
+        this.shown = el('span', { className: 'rt-preview' });
+        this.sugg = el('div', { className: 'rt-sugg' });
+        this.kindBtns = Scripts.KINDS.map(([k, label]) => {
+            const b = btn(label, { qn: 'Quốc Ngữ', pa: 'PA', qatt: 'QATT' }[k], { qn: 'Quốc Ngữ', pa: 'PA', qatt: 'QATT' }[k], () => this.setKind(k));
+            b.dataset.k = k;
+            return b;
+        });
+        this.overBtn = btn(el('span', { className: 'han-btn' }), 'Over (vertical: right)', 'Trên (dọc: bên phải)', () => this.setSide('over'));
+        this.underBtn = btn(el('span', { className: 'han-btn' }), 'Under (vertical: left)', 'Dưới (dọc: bên trái)', () => this.setSide('under'));
+        this.eachBtn = btn(el('span', { className: 'han-btn', textContent: '字字' }), 'Each character its reading from the dictionary', 'Từng chữ theo từ điển', () => this.eachChar());
+        this.box = el('div', { className: 'scroll-ui ruby-box', hidden: true },
+            el('div', { className: 'rt-row' }, this.input, this.ok, this.del),
+            el('div', { className: 'rt-row' }, this.shown),
+            this.sugg,
+            el('div', { className: 'rt-row' }, ...this.kindBtns, el('span', { className: 'sep' }), this.overBtn, this.underBtn, el('span', { className: 'sep' }), this.eachBtn));
+        this.box.addEventListener('mousedown', e => { if (e.target !== this.input) e.preventDefault(); });
+        document.body.append(this.box);
+        document.addEventListener('pointerdown', e => { if (this.isOpen() && !this.box.contains(e.target)) this.close(false); });
+        if (window.VietIme) this.ime = new VietIme(this.input, { candidates: false, defer: true });
+    },
+    isOpen() { return this.box && !this.box.hidden; },
+    async open() {
+        const { state } = this.view, sel = state.selection;
+        let range;
+        if (sel.empty) range = rubyAt(state, sel.from);
+        else if (sel.$from.parent === sel.$to.parent && !state.doc.rangeHasMark(sel.from, sel.to, schema.marks.warichu)) {
+            const r = rubyAt(state, sel.from);   // a selection inside one ruby edits it
+            range = { from: sel.from, to: sel.to, mark: r && r.from <= sel.from && sel.to <= r.to ? r.mark : null };
+        }
+        if (!range) return;
+        this.range = range;
+        const mark = range.mark || null;
+        this.side = mark ? mark.attrs.side : this.side;
+        this.input.value = mark ? (mark.attrs.qn || mark.attrs.rt) : '';
+        this.base = state.doc.textBetween(range.from, range.to);
+        this.del.hidden = !mark;
+        this.eachBtn.hidden = [...this.base].length < 2;
+        this.markKind(); this.markSide();
+        this.box.hidden = false;
+        this.place();
+        this.input.focus();
+        this.input.select();
+        this.sugg.replaceChildren();
+        if (this.kind !== 'qn') await Scripts.load();
+        this.preview();
+        const list = await readingsOf(this.base);
+        if (this.range !== range) return;
+        this.suggestions = list;
+        this.sugg.replaceChildren(...list.slice(0, 12).map(r => {
+            const b = el('button', { type: 'button', className: 'rt-chip', textContent: Scripts.text(r, this.kind) });
+            b.title = r;
+            b.addEventListener('click', () => this.apply(r));
+            return b;
+        }));
+        if (!this.input.value && list.length) { this.input.value = list[0]; this.input.select(); this.preview(); }
+        this.place();
+    },
+    place() {
+        const v = this.view, r = this.range;
+        const a = v.coordsAtPos(r.from), b = v.coordsAtPos(r.to);
+        UI.place(this.box, Math.min(a.left, b.left) - 10, Math.max(a.bottom, b.bottom) + 10);
+    },
+    preview() {
+        const t = Scripts.text(this.input.value.trim(), this.kind);
+        this.shown.textContent = this.kind === 'qn' ? '' : t;
+        this.shown.hidden = this.kind === 'qn';
+    },
+    markKind() {
+        for (const b of this.kindBtns) b.classList.toggle('on', b.dataset.k === this.kind);
+        for (const b of this.sugg.querySelectorAll('.rt-chip')) b.textContent = Scripts.text(b.title, this.kind);
+    },
+    markSide() {
+        const vert = this.view.state.doc.resolve(this.range ? this.range.from : 0).node(1)?.attrs.dir === 'v';
+        this.overBtn.firstChild.textContent = vert ? '右' : '上';
+        this.underBtn.firstChild.textContent = vert ? '左' : '下';
+        this.overBtn.classList.toggle('on', this.side === 'over');
+        this.underBtn.classList.toggle('on', this.side === 'under');
+    },
+    async setKind(k) {
+        this.kind = k;
+        try { localStorage.setItem('scrollsRubyKind', k); } catch (e) { /* only now */ }
+        if (k !== 'qn') await Scripts.load();
+        this.markKind(); this.preview();
+        this.input.focus();
+    },
+    setSide(s) { this.side = s; this.markSide(); this.input.focus(); },
+    async apply(qn) {
+        qn = (qn || '').trim();
+        if (qn && this.kind !== 'qn') await Scripts.load();
+        const { from, to } = this.range, type = schema.marks.ruby, tr = this.view.state.tr.removeMark(from, to, type);
+        if (qn) tr.addMark(from, to, type.create({ rt: Scripts.text(qn, this.kind), qn, side: this.side }));
+        this.view.dispatch(tr);
+        this.close(true);
+    },
+    // each character of the selection gets its own ruby: its first reading in the dictionary
+    async eachChar() {
+        const { from } = this.range, chars = [...this.base];
+        if (this.kind !== 'qn') await Scripts.load();
+        const readings = await Promise.all(chars.map(c => readingsOf(c)));
+        const type = schema.marks.ruby, tr = this.view.state.tr.removeMark(this.range.from, this.range.to, type);
+        let pos = from;
+        chars.forEach((c, i) => {
+            const qn = readings[i][0];
+            if (qn) tr.addMark(pos, pos + c.length, type.create({ rt: Scripts.text(qn, this.kind), qn, side: this.side }));
+            pos += c.length;
+        });
+        this.view.dispatch(tr);
+        this.close(true);
+    },
+    close(focus) {
+        if (!this.box || this.box.hidden) return;
+        this.box.hidden = true;
+        if (this.ime) this.ime.hide();
+        this.range = null;
+        if (focus) this.view.focus();
+        UI.refresh();
+    },
+};
+
 const uiPlugin = new Plugin({
     view: () => ({ update: () => UI.refresh() }),
     props: { handleDOMEvents: { focus: () => { setTimeout(() => UI.refresh()); return false; }, blur: () => { setTimeout(() => UI.refresh()); return false; } } },
@@ -563,6 +784,7 @@ async function start() {
                 'Mod-z': undo, 'Shift-Mod-z': redo, 'Mod-y': redo,
                 'Mod-Alt-1': setHeading(1), 'Mod-Alt-2': setHeading(2), 'Mod-Alt-0': setBlockType(S.paragraph),
                 'Mod-Shift-d': toggleWari,
+                'Mod-Shift-r': openRuby,
                 'Mod-Shift-Space': () => { document.getElementById('telex').click(); return true; },
                 'Backspace': joinSectionBackward, 'Delete': joinSectionForward,
             }),
@@ -583,6 +805,7 @@ async function start() {
         },
     });
     UI.view = editor;
+    RubyBox.init(editor);
     window.scrollsEditor = editor;   // for tests
 
     // Telex and the candidates: on unless switched off (kept in this browser)
@@ -596,6 +819,7 @@ async function start() {
         telexOn = on;
         telexBtn.setAttribute('aria-pressed', on ? 'true' : 'false');
         ime.update({ telex: on, candidates: on });
+        if (RubyBox.ime) RubyBox.ime.update({ telex: on, candidates: false });
         try { localStorage.setItem('scrollsTelex', on ? '1' : '0'); } catch (e) { /* only for this page */ }
     };
     setTelex(telexOn);

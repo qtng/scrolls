@@ -80,3 +80,35 @@
 .scroll-plus.open { transform: rotate(45deg); }
 .scroll-plus-menu { flex-direction: column; align-items: stretch; }
 .scroll-plus-menu button { text-align: start; display: flex; align-items: center; gap: .5rem; }
+
+/* ruby: the base keeps its cell; the reading sits beside it (horizontal: over / under, vertical: right / left), narrowed by editor.js
+   along the line when it is longer than the base (--rs) */
+.ProseMirror .rb { position: relative; }
+/* a block with ruby gets the room for it between its lines (columns) */
+.ProseMirror .sec p:has(.rb), .ProseMirror .sec h1:has(.rb), .ProseMirror .sec h2:has(.rb) { line-height: 2.2; }
+.ProseMirror .rb .rt {
+    position: absolute;
+    font-size: .42em;
+    line-height: 1;
+    white-space: nowrap;
+    pointer-events: none;
+    user-select: none;
+    color: color-mix(in srgb, currentColor 80%, var(--bs-body-bg));
+    text-orientation: mixed;
+}
+.ProseMirror .sec.h .rb .rt { left: 50%; transform: translateX(-50%) scaleX(var(--rs, 1)); }
+.ProseMirror .sec.h .rb[data-side="over"] .rt { bottom: 100%; }
+.ProseMirror .sec.h .rb[data-side="under"] .rt { top: 100%; }
+.ProseMirror .sec.v .rb .rt { top: 50%; transform: translateY(-50%) scaleY(var(--rs, 1)); }
+.ProseMirror .sec.v .rb[data-side="over"] .rt { left: 100%; }
+.ProseMirror .sec.v .rb[data-side="under"] .rt { right: 100%; }
+
+/* the box to write a ruby */
+.ruby-box { flex-direction: column; align-items: stretch; gap: 4px; padding: 6px; width: 17rem; max-width: calc(100vw - 16px); }
+.ruby-box .rt-row { display: flex; align-items: center; gap: 2px; }
+.ruby-box .rt-input { flex: 1 1 auto; min-width: 0; }
+.ruby-box .rt-preview { font-family: var(--doc-font, var(--font-cjk)), var(--font-cjk), serif; font-size: 1.15rem; padding: 0 .3rem; min-height: 1.2em; }
+.ruby-box .rt-preview[hidden] { display: none; }
+.ruby-box .rt-sugg { display: flex; flex-wrap: wrap; gap: 3px; }
+.ruby-box .rt-sugg:empty { display: none; }
+.ruby-box .rt-chip { min-width: 0; height: 1.8rem; border: 1px solid var(--bs-border-color); border-radius: 50rem; padding: 0 .55rem; font-family: var(--doc-font, var(--font-cjk)), var(--font-cjk), serif; }
