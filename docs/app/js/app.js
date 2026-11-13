@@ -156,6 +156,23 @@ window.notesApp = { store, ready, flush() } is for the tests.
     } else lastTap = { t: e.timeStamp, x: e.clientX, y: e.clientY };
   });
 
+  // a document is shown when its fonts are loaded and its layout is done (at most 5 s): no letters in the wrong font, no two-column text moving
+  let revealToken = 0;
+  async function reveal() {
+    const token = ++revealToken, field = $('field');
+    field.classList.add('loading');
+    const ready = (async () => {
+      const family = getComputedStyle(document.documentElement).getPropertyValue('--doc-font').trim();
+      const chars = [...new Set(NomEditor.text() + (state.current && state.current.title || ''))].join('').replace(/\s/g, '');
+      if (family && chars && document.fonts && document.fonts.load) {
+        try { await document.fonts.load(`32px ${family}`, chars); } catch (e) { /* shown in what is there */ }
+      }
+      NomEditor.relayout();
+      await NomEditor.settled();
+    })();
+    await Promise.race([ready, new Promise(r => setTimeout(r, 5000))]);
+    if (token === revealToken) field.classList.remove('loading');
+  }
   function showEditor(doc, fresh, shared) {
     state.shared = !!shared; $('view-editor').classList.toggle('shared', !!shared); $('keep-btn').hidden = $('home-logo').hidden = !shared;
     state.current = doc; state.inStore = !fresh; state.dirty = false;
@@ -165,6 +182,7 @@ window.notesApp = { store, ready, flush() } is for the tests.
     applyStyle(doc);
     applyFormat(doc);
     if (!NomEditor.open(doc.content || null, edited)) snack('Parts of this document could not be read', 'Không đọc được một phần của ghi chú này', { sticky: true });
+    if (!fresh) reveal();
     $('field').scrollTop = 0;
     showTitle();
     setEditing(fresh, false);
@@ -554,6 +572,20 @@ window.notesApp = { store, ready, flush() } is for the tests.
       if (s !== 1) setZoom(z * s, true, at);
     };
     field.addEventListener('touchend', e => { if (e.touches.length < 2) endPinch(); });
+    // the slider too: scaled while it moves, the zoom set when it is let go
+    const slider = $('read-zoom'), centre = () => { const r = field.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; };
+    let drag = null;
+    slider.addEventListener('input', () => {
+      if (!drag) { drag = { z: zoom, at: centre() }; parts().forEach(el => { el.style.willChange = 'transform'; }); }
+      const s = Math.min(300, Math.max(50, +slider.value)) / drag.z;
+      if (!frame) frame = requestAnimationFrame(() => { frame = 0; if (drag) scaleBy(s, drag.at); });
+    });
+    slider.addEventListener('change', () => {
+      const d = drag; drag = null;
+      cancelAnimationFrame(frame); frame = 0;
+      parts().forEach(el => { el.style.transform = ''; el.style.transformOrigin = ''; el.style.willChange = ''; });
+      setZoom(slider.value, true, d ? d.at : undefined);
+    });
     field.addEventListener('touchcancel', endPinch);
     field.addEventListener('wheel', e => {
       if (!e.ctrlKey || !reading()) return;
@@ -569,7 +601,6 @@ window.notesApp = { store, ready, flush() } is for the tests.
     applySize();
   };
   $('set-size').addEventListener('input', () => setFontSize($('set-size').value, true));
-  $('read-zoom').addEventListener('input', () => setZoom($('read-zoom').value, true));
   window.addEventListener('resize', () => { if (state.current) applySize(); });
   // a document without a width (a new one, or one of before): the width of this screen, kept in the document (not for a shared one)
   function fixWidth(doc) {
