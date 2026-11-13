@@ -477,11 +477,11 @@ window.notesApp = { store, ready, flush() } is for the tests.
     $('set-style').append(b);
   }
 
-  // the size: 100% is 22 pixels (the size of Scrolls); the grid of the vertical pages follows it
+  // the size: 100% is 33 pixels (the 150% of the first versions, 22 px); the grid of the vertical pages follows it
   const setSize = (value, user) => {
     value = Math.min(300, Math.max(50, Number(value) || 100));
     $('set-size').value = $('read-zoom').value = value; $('size-label').textContent = $('size-btn-label').textContent = value + '%';
-    document.documentElement.style.setProperty('--doc-size', Math.round(value * 0.22) + 'px');
+    document.documentElement.style.setProperty('--doc-size', Math.round(value * 0.33) + 'px');
     if (user) keepFormat('size', value);
     NomEditor.relayout();
   };
