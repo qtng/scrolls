@@ -22,6 +22,11 @@ const DocsSync = (() => {
   const deletedIds = () => { try { return JSON.parse(localStorage.getItem(DEL_KEY)) || []; } catch (e) { return []; } };
   const keepDeleted = ids => { try { localStorage.setItem(DEL_KEY, JSON.stringify([...new Set(ids)])); } catch (e) { /* not kept */ } };
   const newId = () => crypto.randomUUID();
+  // the version of each document that is known to be the same in the account ("synced up to here"): kept apart from the documents, so that a save of
+  // the open document (which may have an older value of `synced`) cannot lose it; without it the next start would see a conflict that is none
+  const SYNCED_KEY = 'nomNotesSynced';
+  const loadSynced = () => { try { return JSON.parse(localStorage.getItem(SYNCED_KEY)) || {}; } catch (e) { return {}; } };
+  const keepSynced = map => { try { localStorage.setItem(SYNCED_KEY, JSON.stringify(map)); } catch (e) { /* not kept */ } };
 
   async function init() {
     if (typeof SupabaseService === 'undefined' || typeof supabase === 'undefined') return null;
@@ -70,12 +75,13 @@ const DocsSync = (() => {
     }
     keepDeleted([]);
     const docs = new Map(local.map(d => [d.id, { ...d }]));
-    const download = [], upload = [], copies = [];
+    const marks = loadSynced(), download = [], upload = [], copies = [];
     let changed = false;
     for (const [id, rev] of remote) {
       const l = docs.get(id);
       if (!l) { download.push(id); continue; }
-      const base = l.synced || 0, here = l.updated > base, there = rev > base;
+      const base = Math.max(l.synced || 0, marks[id] || 0), here = l.updated > base, there = rev > base;
+      if (here && there && rev === l.updated) { marks[id] = rev; l.synced = rev; continue; }   // the same version on both sides
       if (here && there) {   // both changed: the newer stays, the other becomes a copy
         if (rev >= l.updated) { copies.push({ ...l, id: newId(), title: DocsCore.title(l.text || '', l.title) + ' (' + new Date(l.updated).toLocaleString() + ')', synced: 0 }); if (id !== skip) download.push(id); }
         else { download.push({ id, asCopy: true }); upload.push(l); }
@@ -83,7 +89,7 @@ const DocsSync = (() => {
       else if (here) upload.push(l);
     }
     for (const l of docs.values()) if (!remote.has(l.id)) {
-      if (l.synced && l.id !== skip) { docs.delete(l.id); await store.remove(l.id); changed = true; }   // deleted in the account
+      if ((l.synced || marks[l.id]) && l.id !== skip) { docs.delete(l.id); delete marks[l.id]; await store.remove(l.id); changed = true; }   // deleted in the account
       else upload.push(l);
     }
     // the rows that are newer there
@@ -97,18 +103,21 @@ const DocsSync = (() => {
         if (copy) { const c = { ...doc, id: newId(), title: DocsCore.title(doc.text, doc.title) + ' (' + new Date(doc.updated).toLocaleString() + ')', synced: 0 }; copies.push(c); continue; }
         docs.set(doc.id, doc);
         await store.put(doc);
+        marks[doc.id] = doc.synced;
         changed = true;
       }
     }
     for (const c of copies) { docs.set(c.id, c); await store.put(c); upload.push(c); changed = true; }
+    keepSynced(marks);
     // the documents that are newer here
     for (const d of upload) {
       const { error: e } = await db.from('scrolls').upsert(toRow(d));
       if (e) throw e;
       const now = docs.get(d.id) || d;
-      now.synced = d.updated;
+      now.synced = d.updated;   // in memory and in the marks only: a put here would write the old text over what was typed while it was uploaded
       docs.set(now.id, now);
-      await store.put(now);
+      marks[d.id] = d.updated;
+      keepSynced(marks);
     }
     return { docs: [...docs.values()].sort((a, b) => b.updated - a.updated), changed };
   }

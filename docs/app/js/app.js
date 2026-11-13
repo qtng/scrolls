@@ -528,8 +528,11 @@ window.notesApp = { store, ready, flush() } is for the tests.
     if (byHand) snack('Syncing…', 'Đang đồng bộ…', { sticky: true });
     try {
       await save();
+      const started = Date.now();
       const r = await DocsSync.run(state.docs, state.store, { skip: state.current && state.current.id });
-      state.docs = r.docs;
+      const cur = new Map(state.docs.map(d => [d.id, d]));   // what was typed or made while the sync ran stays (the sync worked on the documents as they were at its start)
+      state.docs = r.docs.map(d => { const c = cur.get(d.id); return c && c.updated > d.updated ? { ...c, synced: d.synced } : d; })
+        .concat(state.docs.filter(c => !r.docs.some(d => d.id === c.id) && c.created >= started));
       if (state.current) { const d = r.docs.find(x => x.id === state.current.id); if (d) state.current.synced = d.synced; }
       if (!state.current && r.changed) renderList();
       if (byHand) snack('Synced', 'Đã đồng bộ');
