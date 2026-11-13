@@ -477,19 +477,19 @@ window.notesApp = { store, ready, flush() } is for the tests.
     $('set-style').append(b);
   }
 
-  // The width of the pages is fixed with the document (format.width, in characters of the text: the width of the screen where it was made, at most
-  // 46rem, at 100% = 32 px), so that zooming never breaks the lines or columns differently. On a narrower screen the document is shown smaller until
-  // it fits, a phone document on a wider one larger up to the width of a desktop document (twice at most): that is 100% there. The zoom (the slider) is not kept: every document opens at 100%.
+  // The width of the pages is fixed with the document (format.width, in characters of the text: as many as fit on the screen where it was made at
+  // 32 px, at most 23), so that zooming never breaks the lines or columns differently. Shown, it fills the width of the screen (smaller where it does
+  // not fit, larger up to twice its size where there is room): that is 100% there. The zoom (the slider) is not kept: every document opens at 100%.
   const BASE = 32;
   try { localStorage.removeItem('nomNotesZoom'); } catch (e) { /* nothing kept */ }   // the zooms an earlier version kept
   const room = () => { const f = $('field'), cs = getComputedStyle(f); return Math.max(160, f.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight)); };
-  const pageWidth = () => Math.round(Math.min(room(), 736) / BASE * 10) / 10;   // in characters of 32 px
+  const MAX_CHARS = 23;
+  const pageWidth = () => Math.min(MAX_CHARS, Math.round(room() / BASE * 10) / 10);   // in characters of 32 px, at most 23
   let zoom = 100;
   function applySize() {
     const doc = state.current, w = doc && doc.format && doc.format.width > 0 ? doc.format.width : pageWidth();
-    // a phone document (narrower than a tablet, 600 px) on a wider screen: as wide as the screen (at most the 46rem of a desktop document) but at
-    // most twice its size; a wider document is only made smaller where it does not fit
-    const narrow = w * BASE < 600, fit = narrow ? Math.max(Math.min(1, room() / (w * BASE)), Math.min(2, Math.min(room(), 736) / (w * BASE))) : Math.min(1, room() / (w * BASE));
+    // the document fills the width of the screen: smaller where it does not fit, larger where there is room, but at most twice its size
+    const fit = Math.min(2, room() / (w * BASE));
     document.documentElement.style.setProperty('--page-em', String(w));
     document.documentElement.style.setProperty('--doc-size', (BASE * fit * zoom / 100).toFixed(2) + 'px');
     NomEditor.relayout();
