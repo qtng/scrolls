@@ -97,7 +97,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 /* the field: the pages of the document on the dark desk of the app */
 .field { flex: 1; min-height: 0; overflow: auto; padding: 1rem .75rem 40vh; }
 #editor { width: max-content; min-width: 0; margin: 0 auto; }
-#editor .ProseMirror { width: calc(var(--page-em, 22) * 1em); }   /* the fixed width of the pages (app.js), in characters: zooming scales it with the text */
+#editor .ProseMirror { width: calc(var(--page-em, 22) * var(--unit, 32px)); }   /* the fixed width of the pages (app.js), in units (a character of 100%): zooming scales it with the text, the font size of the document does not */
 #editor .ProseMirror { outline: none; font-family: var(--doc-font), var(--nom), serif; font-size: var(--doc-size, 32px); }
 .ProseMirror .sec { position: relative; margin: 0 0 2rem; padding: .5em 0; border-radius: 4px; background: var(--field-bg, #efe6cf); color: var(--field-ink, #1b1814); text-shadow: var(--field-shadow, none);
   caret-color: var(--field-ink, #1b1814); box-shadow: 0 .5rem 1.5rem rgba(0, 0, 0, .45); }
