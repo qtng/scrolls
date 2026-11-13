@@ -343,152 +343,114 @@ const placeholderPlugin = new Plugin({
     },
 });
 
-// ---------------------------------------------------------------- the floating controls: bubble menu, plus, section tools
+// ---------------------------------------------------------------- the toolbar (fixed: under the title bar, on a phone at the bottom)
 const UI = {
     view: null,
-    init(view) {
-        this.view = view;
-        const btn = (content, en, viText, run, extra = '') => {
-            const b = el('button', { type: 'button', className: extra });
+    // the phone (narrow or touch): the toolbar sits at the bottom, above the keyboard and above the bottom bar of the site
+    bottom: matchMedia('(max-width: 767.98px), (pointer: coarse)'),
+    init() {
+        this.bar = document.getElementById('toolbar');
+        const btn = (content, en, viText, run) => {
+            const b = el('button', { type: 'button' });
             b.append(content);
             titled(b, en, viText);
-            b.addEventListener('mousedown', e => e.preventDefault());   // keep the selection in the text
-            b.addEventListener('click', () => { run(); this.view.focus(); });
+            b.addEventListener('mousedown', e => e.preventDefault());   // keep the caret and the keyboard in the text
+            b.addEventListener('click', () => { if (!this.view) return; run(); if (!RubyBox.isOpen()) this.view.focus(); });
             return b;
         };
+        const icon = c => el('i', { className: 'bi ' + c });
+        const sep = () => el('span', { className: 'sep' });
         const cmd = c => () => c(this.view.state, this.view.dispatch, this.view);
 
-        // the bubble over a selection
-        this.bH1 = btn('H1', 'Heading', 'Tiêu đề', cmd(setHeading(1)));
-        this.bH2 = btn('H2', 'Subheading', 'Tiêu đề phụ', cmd(setHeading(2)));
-        this.bWari = btn(el('span', { className: 'han-btn', textContent: '雙' }), 'Two-column text', 'Chữ hai dòng', cmd(toggleWari));
-        this.bRuby = btn(el('span', { className: 'han-btn', textContent: '注' }), 'Ruby (reading)', 'Chú âm', () => RubyBox.open());
-        this.bubble = el('div', { className: 'scroll-ui', hidden: true }, this.bH1, this.bH2, el('span', { className: 'sep' }), this.bWari, this.bRuby);
+        this.bH1 = btn(icon('bi-type-h1'), 'Heading', 'Tiêu đề', cmd(setHeading(1)));
+        this.bH2 = btn(icon('bi-type-h2'), 'Subheading', 'Tiêu đề phụ', cmd(setHeading(2)));
+        this.bWari = btn(icon('bi-layout-split'), 'Two-column text', 'Chữ hai dòng', cmd(toggleWari));
+        this.bRuby = btn(icon('bi-superscript'), 'Ruby (reading)', 'Chú âm', () => RubyBox.open());
+        this.bH = btn(icon('bi-text-paragraph'), 'Horizontal section', 'Phần ngang', () => this.setSection({ dir: 'h' }));
+        this.bV = btn(icon('bi-layout-three-columns'), 'Vertical section', 'Phần dọc', () => this.setSection({ dir: 'v' }));
+        this.bLess = btn(icon('bi-dash'), 'Fewer characters per column', 'Ít chữ hơn mỗi cột', () => this.setSection({ step: -1 }));
+        this.colsNum = el('span', { className: 'num' });
+        titled(this.colsNum, 'Characters per column', 'Số chữ mỗi cột');
+        this.bMore = btn(icon('bi-plus'), 'More characters per column', 'Nhiều chữ hơn mỗi cột', () => this.setSection({ step: 1 }));
+        this.bDel = btn(icon('bi-trash'), 'Delete section', 'Xóa phần', () => this.deleteSection());
+        this.bar.append(this.bH1, this.bH2, this.bWari, this.bRuby, sep(), this.bH, this.bV, this.bLess, this.colsNum, this.bMore, sep(), this.bDel);
 
-        // the plus on an empty line: a new section
+        // the plus on an empty line (floating, as on Medium): a new section there
         this.plus = el('button', { type: 'button', className: 'scroll-plus', hidden: true });
-        this.plus.append(el('i', { className: 'bi bi-plus-lg' }));
+        this.plus.append(icon('bi-plus-lg'));
         titled(this.plus, 'New section', 'Phần mới');
         this.plus.addEventListener('mousedown', e => e.preventDefault());
         this.plus.addEventListener('click', () => { this.menuOpen = !this.menuOpen; this.refresh(); });
-        const item = (icon, en, viText, dir) => {
-            const b = btn(el('i', { className: 'bi ' + icon }), en, viText, () => { this.menuOpen = false; insertSection(this.view, dir); });
+        const item = (ic, en, viText, dir) => {
+            const b = btn(icon(ic), en, viText, () => { this.menuOpen = false; insertSection(this.view, dir); });
             b.append(vi(en, viText));
             return b;
         };
         this.plusMenu = el('div', { className: 'scroll-ui scroll-plus-menu', hidden: true },
-            item('bi-text-paragraph', 'Horizontal section', 'Phần ngang', 'h'),
-            item('bi-layout-three-columns', 'Vertical section', 'Phần dọc', 'v'));
-
-        // the tools of the section with the caret
-        this.bH = btn(el('span', { className: 'han-btn', textContent: '橫' }), 'Horizontal', 'Ngang', () => this.setSection({ dir: 'h' }));
-        this.bV = btn(el('span', { className: 'han-btn', textContent: '直' }), 'Vertical', 'Dọc', () => this.setSection({ dir: 'v' }));
-        this.colsNum = el('span', { className: 'num' });
-        titled(this.colsNum, 'Characters per column', 'Số chữ mỗi cột');
-        this.bLess = btn(el('i', { className: 'bi bi-dash' }), 'Fewer characters per column', 'Ít chữ hơn mỗi cột', () => this.setSection({ step: -1 }));
-        this.bMore = btn(el('i', { className: 'bi bi-plus' }), 'More characters per column', 'Nhiều chữ hơn mỗi cột', () => this.setSection({ step: 1 }));
-        this.colsBox = el('span', { className: 'd-inline-flex align-items-center' }, el('span', { className: 'sep' }), this.bLess, this.colsNum, this.bMore);
-        this.bDel = btn(el('i', { className: 'bi bi-trash' }), 'Delete section', 'Xóa phần', () => this.deleteSection());
-        this.tools = el('div', { className: 'scroll-ui', hidden: true }, this.bH, this.bV, this.colsBox, el('span', { className: 'sep' }), this.bDel);
-
-        // the tools of a section only on request: a small button at its corner opens them
-        this.secBtn = el('button', { type: 'button', className: 'scroll-plus scroll-sec', hidden: true });
-        this.secBtn.append(el('i', { className: 'bi bi-sliders2' }));
-        titled(this.secBtn, 'Section settings', 'Cài đặt phần');
-        this.secBtn.addEventListener('mousedown', e => e.preventDefault());
-        this.secBtn.addEventListener('click', () => { this.toolsOpen = !this.toolsOpen; this.refresh(); });
-        document.body.append(this.bubble, this.plus, this.plusMenu, this.secBtn, this.tools);
-        if (window.visualViewport) for (const ev of ['resize', 'scroll']) visualViewport.addEventListener(ev, () => this.refresh());
+            item('bi-text-paragraph', 'Horizontal section', 'Phần ngang', 'h'), item('bi-layout-three-columns', 'Vertical section', 'Phần dọc', 'v'));
+        document.body.append(this.plus, this.plusMenu);
         document.addEventListener('pointerdown', e => {
             if (this.menuOpen && !this.plusMenu.contains(e.target) && !this.plus.contains(e.target)) { this.menuOpen = false; this.refresh(); }
         });
+
+        const pos = () => this.position();
+        if (window.visualViewport) for (const ev of ['resize', 'scroll']) visualViewport.addEventListener(ev, pos);
+        window.addEventListener('resize', pos);
+        this.bottom.addEventListener?.('change', pos);
     },
-    // a touch screen: the system menu (Translate, Cut, Copy) and the selection handles sit over and under the selection, so the menus of the
-    // editor are docked at the bottom of the visible area (above the keyboard) instead
-    coarse: matchMedia('(pointer: coarse)').matches,
-    dock(box) {
-        const vv = window.visualViewport, w = box.offsetWidth, h = box.offsetHeight;
-        const vw = vv ? vv.width : innerWidth, vh = vv ? vv.height : innerHeight, ox = vv ? vv.offsetLeft : 0, oy = vv ? vv.offsetTop : 0;
-        box.classList.add('docked');
-        box.style.left = Math.max(ox + 8, ox + (vw - w) / 2) + 'px';
-        // above the bottom bar of the site (phone): the bar itself if it is shown, else the room that the page keeps for it (body.has-bottom-bar:
-        // 60px + the safe area); a bar that is not measured exactly must not cover the menu, so there is some room more
-        const bar = document.querySelector('.bottom-bar');
-        let barTop = Infinity;
-        if (bar && getComputedStyle(bar).display !== 'none') barTop = Math.min(bar.getBoundingClientRect().top, oy + vh - bar.offsetHeight);
-        else if (document.body.classList.contains('has-bottom-bar') && !bar?.classList.contains('typing')) barTop = oy + vh - 76;
-        box.style.top = Math.max(oy + 8, Math.min(oy + vh, barTop) - h - 24) + 'px';
-    },
-    place(box, left, top) {
-        if (this.coarse && box !== this.plus && box !== this.plusMenu && box !== this.secBtn) return this.dock(box);
-        const w = box.offsetWidth, vw = document.documentElement.clientWidth;
-        box.style.left = Math.max(8, Math.min(left, vw - w - 8)) + scrollX + 'px';
-        box.style.top = Math.max(8, top) + scrollY + 'px';
+    show() { this.bar.hidden = false; this.position(); },
+    // on the phone: fixed at the bottom of the visible area (the keyboard shrinks it), above the bottom bar of the site where it is shown
+    position() {
+        const bar = this.bar;
+        if (!bar || bar.hidden) return;
+        const low = this.bottom.matches;
+        bar.classList.toggle('bottom', low);
+        document.body.classList.toggle('toolbar-bottom', low);
+        if (!low) { bar.style.top = ''; return; }
+        const vv = window.visualViewport, vh = vv ? vv.height : innerHeight, oy = vv ? vv.offsetTop : 0;
+        const site = document.querySelector('.bottom-bar');
+        let limit = oy + vh;
+        if (site && getComputedStyle(site).display !== 'none') limit = Math.min(limit, site.getBoundingClientRect().top);
+        bar.style.top = Math.max(0, limit - bar.offsetHeight) + 'px';
+        if (RubyBox.isOpen()) RubyBox.place();
     },
     refresh() {
         const view = this.view;
-        if (!view || !view.state) return;
-        const { state } = view, sel = state.selection, focused = view.hasFocus();
-        const show = (box, on) => { box.hidden = !on; return on; };
-
-        // bubble: over a selection, or with the caret in a ruby (to edit it)
+        if (!view || !view.state || !this.bar) return;
+        const { state } = view, sel = state.selection, $f = sel.$from, p = $f.parent;
+        const wari = schema.marks.warichu, ruby = schema.marks.ruby;
+        const on = (b, v) => b.classList.toggle('on', !!v);
+        on(this.bH1, p.type === S.heading && p.attrs.level === 1);
+        on(this.bH2, p.type === S.heading && p.attrs.level === 2);
+        on(this.bWari, sel.empty ? wari.isInSet(state.storedMarks || $f.marks()) : state.doc.rangeHasMark(sel.from, sel.to, wari));
         const inRuby = sel.empty && rubyAt(state, sel.from);
-        if (show(this.bubble, focused && !RubyBox.isOpen() && sel instanceof TextSelection && (!sel.empty || !!inRuby))) {
-            const a = view.coordsAtPos(sel.from), b = view.coordsAtPos(sel.to);
-            const p = sel.$from.parent;
-            this.bH1.classList.toggle('on', p.type === S.heading && p.attrs.level === 1);
-            this.bH2.classList.toggle('on', p.type === S.heading && p.attrs.level === 2);
-            const wari = schema.marks.warichu;
-            this.bWari.classList.toggle('on', state.doc.rangeHasMark(sel.from, sel.to, wari));
-            this.bRuby.classList.toggle('on', !!inRuby || state.doc.rangeHasMark(sel.from, sel.to, schema.marks.ruby));
-            this.bRuby.disabled = !sel.empty && (sel.$from.parent !== sel.$to.parent || state.doc.rangeHasMark(sel.from, sel.to, wari));
-            const top = Math.min(a.top, b.top) - this.bubble.offsetHeight - 8;
-            this.place(this.bubble, (Math.min(a.left, b.left) + Math.max(a.right, b.right)) / 2 - this.bubble.offsetWidth / 2, top < 8 ? Math.max(a.bottom, b.bottom) + 8 : top);
-        }
+        on(this.bRuby, inRuby || (!sel.empty && state.doc.rangeHasMark(sel.from, sel.to, ruby)));
+        this.bRuby.disabled = !(inRuby || (!sel.empty && $f.parent === sel.$to.parent && !state.doc.rangeHasMark(sel.from, sel.to, wari)));
+        const a = $f.depth >= 1 ? $f.node(1).attrs : null;
+        on(this.bH, a && a.dir === 'h');
+        on(this.bV, a && a.dir === 'v');
+        const vert = !!a && a.dir === 'v';
+        this.colsNum.textContent = vert ? a.cols : '–';
+        this.bLess.disabled = !vert || a.cols <= MIN_COLS;
+        this.bMore.disabled = !vert || a.cols >= MAX_COLS;
+        this.bDel.disabled = state.doc.childCount < 2;
+        this.position();
 
-        // plus on an empty paragraph
-        const $c = sel.empty ? sel.$from : null;
-        const emptyLine = focused && $c && $c.depth === 2 && $c.parent.type === S.paragraph && !$c.parent.content.size;
+        // the plus on an empty paragraph (vertical: above the column, horizontal: left of the line) and its menu under it
+        const emptyLine = view.hasFocus() && sel.empty && $f.depth === 2 && p.type === S.paragraph && !p.content.size;
         if (!emptyLine) this.menuOpen = false;
-        if (show(this.plus, emptyLine)) {
-            const c = view.coordsAtPos($c.pos), vert = $c.node(1).attrs.dir === 'v';
-            const size = this.plus.offsetWidth || 32;
-            if (vert) this.place(this.plus, (c.left + c.right) / 2 - size / 2, c.top - size - 10);
-            else this.place(this.plus, c.left - size - 12, (c.top + c.bottom) / 2 - size / 2);
+        this.plus.hidden = !emptyLine;
+        this.plusMenu.hidden = !(emptyLine && this.menuOpen);
+        if (emptyLine) {
+            const c = view.coordsAtPos($f.pos), size = this.plus.offsetWidth || 32;
+            const x = vert ? (c.left + c.right) / 2 - size / 2 : c.left - size - 12, y = vert ? c.top - size - 10 : (c.top + c.bottom) / 2 - size / 2;
+            this.plus.style.left = Math.max(4, x) + scrollX + 'px';
+            this.plus.style.top = Math.max(4, y) + scrollY + 'px';
             this.plus.classList.toggle('open', !!this.menuOpen);
-        }
-        if (show(this.plusMenu, emptyLine && !!this.menuOpen)) {
-            const r = this.plus.getBoundingClientRect();
-            this.place(this.plusMenu, r.left, r.bottom + 6);
-        }
-
-        // the button of the section settings (at the corner of the section) and, if it was pressed, the tools
-        const secOk = focused && sel.empty && !inRuby && sel.$from.depth >= 1 && !emptyLine;
-        const secPos = secOk ? sectionAt(sel.$from).pos : -1;
-        if (secPos !== this.toolsFor) { this.toolsOpen = false; this.toolsFor = secPos; }   // another section: closed again
-        if (show(this.secBtn, secOk)) {
-            const dom = view.nodeDOM(secPos);
-            if (dom) {
-                const r = dom.getBoundingClientRect(), size = this.secBtn.offsetWidth || 32;
-                this.place(this.secBtn, Math.max(8, r.left - size - 8), Math.max(r.top, 8));
-            }
-            this.secBtn.classList.toggle('open', !!this.toolsOpen);
-        }
-        if (show(this.tools, secOk && !!this.toolsOpen)) {
-            const sec = sectionAt(sel.$from), dom = view.nodeDOM(sec.pos);
-            const a = sec.node.attrs;
-            this.bH.classList.toggle('on', a.dir === 'h');
-            this.bV.classList.toggle('on', a.dir === 'v');
-            this.colsBox.hidden = a.dir !== 'v';
-            this.colsBox.classList.toggle('d-none', a.dir !== 'v');
-            this.colsNum.textContent = a.cols;
-            this.bLess.disabled = a.cols <= MIN_COLS;
-            this.bMore.disabled = a.cols >= MAX_COLS;
-            this.bDel.disabled = state.doc.childCount < 2;
-            if (dom) {
-                // under the button of the settings
-                const br = this.secBtn.getBoundingClientRect();
-                this.place(this.tools, br.left, br.bottom + 6);
+            if (this.menuOpen) {
+                const r = this.plus.getBoundingClientRect(), w = this.plusMenu.offsetWidth, vw = document.documentElement.clientWidth;
+                this.plusMenu.style.left = Math.max(8, Math.min(r.left, vw - w - 8)) + 'px';
+                this.plusMenu.style.top = r.bottom + 6 + 'px';
             }
         }
     },
@@ -509,6 +471,7 @@ const UI = {
         view.dispatch(tr.scrollIntoView());
     },
 };
+
 // the box to write a ruby: a field (Quốc Ngữ, with Telex), the readings of the dictionary, the script (QN, PA, QATT), the side, each character
 const RubyBox = {
     view: null, range: null, kind: 'qn', side: 'over',
@@ -540,9 +503,9 @@ const RubyBox = {
             b.dataset.k = k;
             return b;
         });
-        this.overBtn = btn(el('span', { className: 'han-btn' }), 'Over (vertical: right)', 'Trên (dọc: bên phải)', () => this.setSide('over'));
-        this.underBtn = btn(el('span', { className: 'han-btn' }), 'Under (vertical: left)', 'Dưới (dọc: bên trái)', () => this.setSide('under'));
-        this.eachBtn = btn(el('span', { className: 'han-btn', textContent: '字字' }), 'Each character its reading from the dictionary', 'Từng chữ theo từ điển', () => this.eachChar());
+        this.overBtn = btn(el('i', { className: 'bi' }), 'Over (vertical: right)', 'Trên (dọc: bên phải)', () => this.setSide('over'));
+        this.underBtn = btn(el('i', { className: 'bi' }), 'Under (vertical: left)', 'Dưới (dọc: bên trái)', () => this.setSide('under'));
+        this.eachBtn = btn(el('i', { className: 'bi bi-magic' }), 'Each character its reading from the dictionary', 'Từng chữ theo từ điển', () => this.eachChar());
         this.box = el('div', { className: 'scroll-ui ruby-box', hidden: true },
             el('div', { className: 'rt-row' }, this.input, this.ok, this.del),
             el('div', { className: 'rt-row' }, this.shown),
@@ -590,10 +553,12 @@ const RubyBox = {
         if (!this.input.value && list.length) { this.input.value = list[0]; this.input.select(); this.preview(); }
         this.place();
     },
+    // fixed at the toolbar: under it, on the phone above it
     place() {
-        const v = this.view, r = this.range;
-        const a = v.coordsAtPos(r.from), b = v.coordsAtPos(r.to);
-        UI.place(this.box, Math.min(a.left, b.left) - 10, Math.max(a.bottom, b.bottom) + 10);
+        const t = UI.bar.getBoundingClientRect(), b = UI.bRuby.getBoundingClientRect(), w = this.box.offsetWidth, h = this.box.offsetHeight;
+        const vw = document.documentElement.clientWidth;
+        this.box.style.left = Math.max(8, Math.min(b.left, vw - w - 8)) + 'px';
+        this.box.style.top = (UI.bottom.matches ? Math.max(8, t.top - h - 6) : t.bottom + 6) + 'px';
     },
     preview() {
         const t = Scripts.text(this.input.value.trim(), this.kind);
@@ -606,8 +571,8 @@ const RubyBox = {
     },
     markSide() {
         const vert = this.view.state.doc.resolve(this.range ? this.range.from : 0).node(1)?.attrs.dir === 'v';
-        this.overBtn.firstChild.textContent = vert ? '右' : '上';
-        this.underBtn.firstChild.textContent = vert ? '左' : '下';
+        this.overBtn.firstChild.className = 'bi ' + (vert ? 'bi-arrow-right' : 'bi-arrow-up');
+        this.underBtn.firstChild.className = 'bi ' + (vert ? 'bi-arrow-left' : 'bi-arrow-down');
         this.overBtn.classList.toggle('on', this.side === 'over');
         this.underBtn.classList.toggle('on', this.side === 'under');
     },
@@ -698,7 +663,7 @@ const imeKeys = new Plugin({
         handleKeyDown(view, e) {
             if (!ime || !ime.visible || e.isComposing) return false;
             if (['ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Escape'].includes(e.key)) return true;
-            if (e.key === 'Enter' && ime.active >= 0 && !(e.shiftKey || e.ctrlKey || e.metaKey || e.altKey)) return true;
+            if (e.key === 'Enter' && !(e.shiftKey || e.ctrlKey || e.metaKey || e.altKey)) return true;   // Enter takes the candidate (returnSelect)
             return false;
         },
     },
@@ -826,7 +791,7 @@ async function start() {
             uiPlugin,
         ],
     });
-    UI.init({});   // the elements first, the view below
+    UI.init();   // the buttons first, the view below
     editor = new EditorView(editorEl, {
         state,
         dispatchTransaction(tr) {
@@ -836,6 +801,8 @@ async function start() {
     });
     UI.view = editor;
     RubyBox.init(editor);
+    UI.show();
+    UI.refresh();
     window.scrollsEditor = editor;   // for tests
 
     // Telex and the candidates: on unless switched off (kept in this browser)
@@ -843,7 +810,7 @@ async function start() {
     let telexOn = true;
     try { telexOn = localStorage.getItem('scrollsTelex') !== '0'; } catch (e) { /* default */ }
     const adapter = new ImeAdapter(editor);
-    ime = new VietIme(adapter, { defer: true, telex: telexOn, candidates: telexOn });
+    ime = new VietIme(adapter, { defer: true, telex: telexOn, candidates: telexOn, returnSelect: true });
     adapter.ime = ime;
     const setTelex = on => {
         telexOn = on;

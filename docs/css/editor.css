@@ -1,16 +1,15 @@
 /* The editor of a scroll (edit.html). Only layout and the editor's own elements; colours from the Bootstrap variables that the themes set. */
 
-.scroll-bar { display: flex; align-items: center; gap: .5rem; max-width: 52rem; margin: 1rem auto 0; padding: 0 1rem; }
+.scroll-head { position: sticky; top: 0; z-index: 1040; background: var(--bs-body-bg); border-bottom: 1px solid var(--bs-border-color); }
+.scroll-bar { display: flex; align-items: center; gap: .5rem; max-width: 52rem; margin: 0 auto; padding: .6rem 1rem .2rem; }
 .scroll-bar .form-select { width: auto; flex: none; }
 .title-input { flex: 1 1 auto; min-width: 0; border: 0; background: transparent; color: inherit; font-size: 1.2rem; font-weight: 600; outline: none; padding: .25rem 0; }
 .title-input::placeholder { color: var(--bs-secondary-color); font-weight: 400; }
 .telex { flex: none; opacity: .45; }
 .telex[aria-pressed="true"] { opacity: 1; }
-.telex .han { font-size: 1.05rem; line-height: 1; }
 .status { flex: none; font-size: .8rem; color: var(--bs-secondary-color); white-space: nowrap; }
 @media (max-width: 575.98px) { .telex { flex: none; opacity: .45; }
 .telex[aria-pressed="true"] { opacity: 1; }
-.telex .han { font-size: 1.05rem; line-height: 1; }
 .status { display: none; } .scroll-bar #size { display: none; } }
 
 .page { max-width: 46rem; margin: 0 auto; padding: 2.5rem 1rem 40vh; }
@@ -62,8 +61,8 @@
 /* the placeholder of an empty scroll */
 .ProseMirror .is-empty::before { content: attr(data-placeholder); position: absolute; color: var(--bs-secondary-color); pointer-events: none; }
 
-/* floating controls */
-.scroll-ui { position: absolute; z-index: 1050; display: flex; align-items: center; gap: 2px; padding: 3px; border-radius: .6rem;
+/* the box of the ruby (fixed at the toolbar) and the toolbar */
+.scroll-ui { position: fixed; z-index: 1065; display: flex; align-items: center; gap: 2px; padding: 3px; border-radius: .6rem;
     background: var(--bs-body-bg); color: var(--bs-body-color); border: 1px solid var(--bs-border-color); box-shadow: 0 .3rem 1rem rgba(0, 0, 0, .15); font-size: .85rem; }
 .scroll-ui[hidden] { display: none; }
 .scroll-ui button { border: 0; background: transparent; color: inherit; border-radius: .4rem; min-width: 2rem; height: 2rem; padding: 0 .45rem; line-height: 1; white-space: nowrap; }
@@ -73,13 +72,6 @@
 .scroll-ui .sep { width: 1px; align-self: stretch; margin: 3px 2px; background: var(--bs-border-color); }
 .scroll-ui .num { min-width: 1.6rem; text-align: center; font-variant-numeric: tabular-nums; }
 .scroll-ui .lbl { color: var(--bs-secondary-color); padding: 0 .3rem; white-space: nowrap; }
-.scroll-ui .han-btn { font-family: var(--font-cjk), serif; font-size: 1rem; }
-.scroll-plus { position: absolute; z-index: 1050; width: 2rem; height: 2rem; border-radius: 50%; border: 1px solid var(--bs-border-color);
-    background: var(--bs-body-bg); color: var(--bs-secondary-color); display: flex; align-items: center; justify-content: center; padding: 0; transition: transform .15s; }
-.scroll-plus[hidden] { display: none; }
-.scroll-plus.open { transform: rotate(45deg); }
-.scroll-plus-menu { flex-direction: column; align-items: stretch; }
-.scroll-plus-menu button { text-align: start; display: flex; align-items: center; gap: .5rem; }
 
 /* ruby: the base keeps its cell; the reading sits beside it (horizontal: over / under, vertical: right / left), narrowed by editor.js
    along the line when it is longer than the base (--rs) */
@@ -113,9 +105,26 @@
 .ruby-box .rt-sugg:empty { display: none; }
 .ruby-box .rt-chip { min-width: 0; height: 1.8rem; border: 1px solid var(--bs-border-color); border-radius: 50rem; padding: 0 .55rem; font-family: var(--doc-font, var(--font-cjk)), var(--font-cjk), serif; }
 
-/* on a touch screen the menus are docked above the keyboard (editor.js) */
-.scroll-ui.docked { position: fixed; z-index: 1060; }
+/* the toolbar: under the title bar (it stays at the top when the page scrolls); on a phone fixed at the bottom (editor.js sets its top) */
+.toolbar { display: flex; align-items: center; gap: 2px; max-width: 52rem; margin: 0 auto; padding: .15rem 1rem .35rem; overflow-x: auto; scrollbar-width: none; font-size: .85rem; }
+.toolbar[hidden] { display: none; }
+.toolbar::-webkit-scrollbar { display: none; }
+.toolbar button { flex: none; border: 0; background: transparent; color: inherit; border-radius: .4rem; min-width: 2.1rem; height: 2.1rem; padding: 0 .45rem; line-height: 1; white-space: nowrap; }
+.toolbar button:hover { background: color-mix(in srgb, currentColor 10%, transparent); }
+.toolbar button.on { background: color-mix(in srgb, currentColor 18%, transparent); }
+.toolbar button:disabled { opacity: .3; }
+.toolbar .sep { flex: none; width: 1px; align-self: stretch; margin: 5px 4px; background: var(--bs-border-color); }
+.toolbar .num { flex: none; min-width: 1.6rem; text-align: center; font-variant-numeric: tabular-nums; }
+.toolbar.bottom { position: fixed; left: 0; right: 0; max-width: none; margin: 0; z-index: 1060; background: var(--bs-body-bg);
+    border-top: 1px solid var(--bs-border-color); box-shadow: 0 -.2rem .8rem rgba(0, 0, 0, .06); padding: .3rem .5rem; }
+body.toolbar-bottom .page { padding-bottom: 50vh; }
+.toolbar.bottom button { min-width: 1.85rem; padding: 0 .3rem; }
+.toolbar.bottom .sep { margin: 5px 2px; }
 
-/* the button of the section settings: small and quiet, at the corner of the section */
-.scroll-sec { width: 1.7rem; height: 1.7rem; font-size: .8rem; opacity: .7; }
-.scroll-sec.open { transform: none; opacity: 1; background: color-mix(in srgb, currentColor 12%, var(--bs-body-bg)); }
+/* the plus on an empty line and its menu */
+.scroll-plus { position: absolute; z-index: 1050; width: 2rem; height: 2rem; border-radius: 50%; border: 1px solid var(--bs-border-color);
+    background: var(--bs-body-bg); color: var(--bs-secondary-color); display: flex; align-items: center; justify-content: center; padding: 0; transition: transform .15s; }
+.scroll-plus[hidden] { display: none; }
+.scroll-plus.open { transform: rotate(45deg); }
+.scroll-plus-menu { flex-direction: column; align-items: stretch; }
+.scroll-plus-menu button { text-align: start; display: flex; align-items: center; gap: .5rem; }

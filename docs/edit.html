@@ -21,17 +21,20 @@
     <script src="/scrolls/js/prosemirror.js"></script>
 </head>
 <body>
+    <header class="scroll-head">
     <div class="scroll-bar">
         <a href="/scrolls/" class="btn btn-quiet btn-sm back" aria-label="All scrolls" data-vi-aria-label="Tất cả các cuốn"><i class="bi bi-arrow-left"></i></a>
         <input id="title" class="title-input" type="text" placeholder="Untitled" data-vi-placeholder="Chưa đặt tên" aria-label="Title" data-vi-aria-label="Tiêu đề" autocomplete="off">
         <span id="status" class="status" aria-live="polite"></span>
-        <button id="telex" type="button" class="btn btn-quiet btn-sm telex" aria-pressed="true" title="Vietnamese typing (Telex) and Chữ Nôm candidates" data-vi-title="Gõ tiếng Việt (Telex) và gợi ý chữ Nôm"><span class="han">喃</span></button>
+        <button id="telex" type="button" class="btn btn-quiet btn-sm telex" aria-pressed="true" title="Vietnamese typing (Telex) and Chữ Nôm candidates" data-vi-title="Gõ tiếng Việt (Telex) và gợi ý chữ Nôm"><i class="bi bi-keyboard"></i></button>
         <select id="font" class="form-select form-select-sm" data-qatt-fonts aria-label="Font" data-vi-aria-label="Phông chữ"></select>
         <select id="size" class="form-select form-select-sm" aria-label="Size" data-vi-aria-label="Cỡ chữ">
             <option value="16">16</option><option value="18">18</option><option value="20">20</option><option value="22" selected>22</option>
             <option value="24">24</option><option value="28">28</option><option value="32">32</option><option value="40">40</option>
         </select>
     </div>
+    <div id="toolbar" class="toolbar" role="toolbar" aria-label="Format" data-vi-aria-label="Định dạng" hidden></div>
+    </header>
     <main class="page">
         <div id="message" class="message" hidden></div>
         <div id="editor"></div>
