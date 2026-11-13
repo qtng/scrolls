@@ -50,11 +50,11 @@ const DocsSync = (() => {
       if (s.title) doc.title = s.title;
       if (s.format) doc.format = s.format;
       if (s.style) doc.style = s.style;
-    } else {   // a scroll of the first editor: its title, font and size (pixels; 100% is 33 pixels here)
+    } else {   // a scroll of the first editor: its title, font and size (pixels; 100% is 32 pixels here)
       if (row.title) doc.title = row.title;
       const format = {};
       if (typeof s.font === 'string' && s.font) format.font = s.font;
-      if (Number.isFinite(+s.size) && +s.size > 0) format.size = Math.min(300, Math.max(50, Math.round(+s.size / 0.33 / 10) * 10));
+      if (Number.isFinite(+s.size) && +s.size > 0) format.size = Math.min(300, Math.max(50, Math.round(+s.size / 0.32 / 10) * 10));
       if (Object.keys(format).length) doc.format = format;
     }
     return doc;
