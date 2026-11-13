@@ -302,6 +302,25 @@ const measure = {
         }
         return chars.map(c => this.cache.get(keyOf(c)));
     },
+    // vertical: how far the box of two-column text (.seg, aligned to the top of the font) lies beside the axis of the column: the centre of the
+    // box minus the centre of a character of the column, in px (the font of the group cs); the layout moves the box back by it
+    segShift(cs) {
+        const font = `${cs.fontStyle} ${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`, key = 'shift\n' + font;
+        if (!this.cache.has(key)) {
+            const pr = el('div', { ariaHidden: 'true' });
+            pr.style.cssText = 'position:absolute;left:0;top:0;visibility:hidden;white-space:pre;writing-mode:vertical-rl;text-orientation:upright;';
+            pr.style.font = font;
+            const main = document.createTextNode('\u570b'), seg = el('span', { textContent: '\u570b\u570b' });
+            seg.style.cssText = 'display:inline-block;box-sizing:content-box;font-size:.5em;line-height:1;block-size:2em;vertical-align:text-top;';
+            pr.append(main, seg);
+            document.body.append(pr);
+            const rng = document.createRange(); rng.setStart(main, 0); rng.setEnd(main, 1);
+            const a = rng.getBoundingClientRect(), b = seg.getBoundingClientRect();
+            this.cache.set(key, (b.left + b.right) / 2 - (a.left + a.right) / 2);
+            pr.remove();
+        }
+        return this.cache.get(key);
+    },
 };
 
 // The segments of a run of two-column text (chars: code points, widths: their advances in px). The grid of the old prints: a segment takes
@@ -420,6 +439,7 @@ class Layout {
                 l: parseFloat(cs.paddingLeft) + parseFloat(cs.borderLeftWidth), r: parseFloat(cs.paddingRight) + parseFloat(cs.borderRightWidth) };
             const len = v ? (+sec.dataset.cols || DEFAULT_COLS) * em : sec.offsetWidth - pad.l - pad.r;
             info.set(sec, { v, gap, len, pad, pitch: len + gap });
+            if (v) sec.style.setProperty('--seg-shift', measure.segShift(cs).toFixed(2) + 'px');   // two-column text on the axis of its column
             if (v) sec.style.height = (200 * (len + gap) + pad.t + pad.b) + 'px';   // generous first, cut to whole bands below
         }
         const runs = wariRuns(view.state.doc), mks = view.dom.querySelectorAll('i.mk');
