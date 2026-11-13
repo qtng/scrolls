@@ -204,3 +204,16 @@ input.doc-title:focus { border-color: var(--accent); }
 .appbar .ime-select { flex: 0 1 auto; min-width: 0; max-width: 8.5rem; height: 44px; padding: 0 .3rem; border: 1px solid var(--line); border-radius: 10px; background: transparent; color: inherit; font-size: .85rem; }
 .appbar .ime-select option { color: var(--ink); background: var(--bg); }
 .fmtbar .page-tools button { width: 40px; height: 40px; }
+
+/* the title bar of the editor: back, undo, redo, new page, then edit, style, menu; the format bar: the buttons, the direction, the size, the input */
+.appbar .bar-btn { flex: none; width: 44px; height: 44px; margin-left: .2rem; border: 1px solid var(--line); border-radius: 10px; background: transparent; font-size: 1.1rem; }
+.appbar .bar-btn:disabled { opacity: .35; }
+.appbar .bar-btn:active { background: rgba(255, 255, 255, .1); }
+.appbar .page-tools { margin-left: .2rem; }
+.appbar .page-tools button { width: 44px; height: 44px; }
+.size-btn { display: flex; align-items: center; gap: .25rem; height: 40px; padding: 0 .45rem; border: 1px solid var(--line); border-radius: 10px; background: transparent; font-size: .85rem; white-space: nowrap; }
+.size-btn .caret { font-size: .65rem; opacity: .7; }
+.size-btn[aria-expanded="true"] { color: var(--accent); border-color: var(--accent); }
+.fmtbar .page-tools button { width: 40px; height: 40px; }
+.fmtbar .ime-select { max-width: 6.5rem; }
+.reading .bar-btn { opacity: .35; pointer-events: none; }   /* the size stays: also for reading */

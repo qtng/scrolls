@@ -95,7 +95,7 @@ window.notesApp = { store, ready, flush() } is for the tests.
   window.addEventListener('pagehide', () => { save(); });
 
   // ----- editor -----
-  NomEditor.mount($('editor'), { format: $('toolbar'), dir: $('page-tools'), menu: $('page-menu') }, [NomInput.plugin]);
+  NomEditor.mount($('editor'), { format: $('toolbar'), dir: $('page-tools'), menu: $('page-menu'), newPage: $('page-new') }, [NomInput.plugin]);
   $('menu').addEventListener('click', e => { if (e.target.closest('.menu-close')) closeMenu(); });
   const edited = () => { schedule(); showTitle(); buttons(); };
   const showTitle = () => {   // above the pages; without a title a muted "Untitled"

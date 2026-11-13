@@ -516,7 +516,7 @@ const placeholderPlugin = new Plugin({
 // ---------------------------------------------------------------- the toolbar (the format bar of the app)
 const UI = {
     view: null,
-    // parts: format (the format bar: headings, two-column text, ruby), dir (the title bar: the direction), menu (the menu: characters per column, new page)
+    // parts: format (the format bar: headings, two-column text, ruby), dir (the direction, in the format bar), menu (characters per column), newPage (the title bar)
     init(parts) {
         this.bar = parts.format;
         const btn = (content, en, viText, run) => {
@@ -553,12 +553,11 @@ const UI = {
         this.bDir.classList.add('dir-btn');
         this.selCols = select('Characters per column', 'Số chữ mỗi cột', COLS_OPTIONS.map(n => [String(n), String(n)]), v => this.setSettings({ cols: clampCols(+v) }));
         const colsRow = el('label', { className: 'menu-row' }, vi('Characters per column', 'Số chữ mỗi cột'), this.selCols);
-        this.bPage = el('button', { type: 'button', className: 'menu-close' }, icon('fa-file-circle-plus'), vi('New page', 'Trang mới'));
-        this.bPage.title = 'Ctrl+Enter';
-        this.bPage.addEventListener('click', () => { if (!this.view) return; pageBreak(this.view.state, this.view.dispatch); this.view.focus(); });
+        this.bPage = btn(icon('fa-file-circle-plus'), 'New page (Ctrl+Enter)', 'Trang mới (Ctrl+Enter)', cmd(pageBreak));
         this.bar.append(this.bH1, this.bH2, this.bWari, this.bRuby);
         parts.dir.append(this.bDir);
-        parts.menu.append(colsRow, this.bPage);
+        parts.menu.append(colsRow);
+        (parts.newPage || parts.menu).append(this.bPage);
         void sep;
 
         window.addEventListener('resize', () => this.position());
