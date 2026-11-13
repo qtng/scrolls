@@ -4,7 +4,7 @@ The editor of a scroll (edit.html?id=<uuid>; edit.html?local: a test mode withou
 A scroll is sections of blocks: doc > section+ > (paragraph | heading)+. A section is horizontal (flowing text) or vertical
 (columns of `cols` characters, right to left, continued in bands below). Two-column text (warichu) is a mark; editor.js lays it
 out as segments (inline decorations), the bands of vertical sections get their height here. ProseMirror comes from js/prosemirror.js
-(window.PM, built in the private repository), the Telex input and the Chữ Nôm candidates from /chunom/js/ime.js.
+(window.PM, built in the private repository), the Telex input from /chunom/js/ime.js (no candidate list).
 */
 (() => {
 'use strict';
@@ -14,6 +14,7 @@ const QATT = 'https://qatt.org';
 
 const T = (en, vi) => (window.Lang ? Lang.t(en, vi) : en);
 const MIN_COLS = 2, MAX_COLS = 40, DEFAULT_COLS = 10;
+const COLS_OPTIONS = [4, 6, 8, 10, 12, 16, 20, 24, 30, 36, 42];
 const clampCols = n => Math.max(MIN_COLS, Math.min(MAX_COLS, Math.round(n) || DEFAULT_COLS));
 const el = (tag, props = {}, ...children) => { const e = Object.assign(document.createElement(tag), props); e.append(...children); return e; };
 // a text in a tag of its own with its Vietnamese text (translated by Lang of navigation.js)
@@ -285,15 +286,6 @@ const Scripts = {
     fromPa(pa) { return this.parser && typeof PaText !== 'undefined' ? PaText.read(pa, this.parser) : ''; },
 };
 
-// the readings of a character or word in the dictionaries of ime.js, in Quốc Ngữ
-async function readingsOf(text) {
-    if (!window.VietIme || !text) return [];
-    try { await VietIme.load(); } catch (e) { return []; }
-    const seen = new Set();
-    for (const e of VietIme.lookupGlyph(text)) if (e.glyph === text && e.reading) seen.add(e.reading);
-    return [...seen];
-}
-
 // text with the annotation of the QATT fonts: a character, U+F00B0 (over) or U+F00B1 (under), a PA syllable, maybe U+F00B2 (end)
 const ANNOT = /(\P{M})([\u{F00B0}\u{F00B1}])([\u{F00D0}-\u{F010E}]+)\u{F00B2}?/gu;
 function annotToRuby(fragment) {
@@ -359,24 +351,30 @@ const UI = {
             return b;
         };
         const icon = c => el('i', { className: 'fa-solid ' + c });
-        // two-column text: one line of big characters with two small lines between them
-        const wariIcon = () => { const w = el('span', { className: 'wari-icon' }); w.innerHTML = '<svg viewBox="0 0 16 16" width="1.15em" height="1.15em" fill="none" stroke="currentColor" stroke-linecap="round"><path d="M1.5 8h3M11.5 8h3" stroke-width="2.2"/><path d="M6 5.2h4M6 10.8h4" stroke-width="1.5"/></svg>'; return w; };
         const hIcon = n => el('span', { className: 'h-icon' }, icon('fa-heading'), el('sub', {}, String(n)));
         const sep = () => el('span', { className: 'sep' });
         const cmd = c => () => c(this.view.state, this.view.dispatch, this.view);
 
         this.bH1 = btn(hIcon(1), 'Heading', 'Tiêu đề', cmd(setHeading(1)));
         this.bH2 = btn(hIcon(2), 'Subheading', 'Tiêu đề phụ', cmd(setHeading(2)));
-        this.bWari = btn(wariIcon(), 'Two-column text', 'Chữ hai dòng', cmd(toggleWari));
-        this.bRuby = btn(icon('fa-superscript'), 'Ruby (reading)', 'Chú âm', () => RubyBox.open());
-        this.bH = btn(icon('fa-grip-lines'), 'Horizontal section', 'Phần ngang', () => this.setSection({ dir: 'h' }));
-        this.bV = btn(icon('fa-grip-lines-vertical'), 'Vertical section', 'Phần dọc', () => this.setSection({ dir: 'v' }));
-        this.bLess = btn(icon('fa-minus'), 'Fewer characters per column', 'Ít chữ hơn mỗi cột', () => this.setSection({ step: -1 }));
-        this.colsNum = el('span', { className: 'num' });
-        titled(this.colsNum, 'Characters per column', 'Số chữ mỗi cột');
-        this.bMore = btn(icon('fa-plus'), 'More characters per column', 'Nhiều chữ hơn mỗi cột', () => this.setSection({ step: 1 }));
+        this.bWari = btn(vi('split', 'chia'), 'Two-column text', 'Chữ hai dòng', cmd(toggleWari));
+        this.bWari.classList.add('txt');
+        this.bRuby = btn(icon('fa-pencil'), 'Ruby (reading)', 'Chú âm', () => RubyBox.open());
+        // the section settings are drop-downs; the group label says what the option is
+        const select = (label, labelVi, options, change) => {
+            const sel = el('select', { className: 'form-select form-select-sm' });
+            const g = el('optgroup', { label });
+            g.setAttribute('data-vi-label', labelVi);
+            for (const [value, en, viText] of options) { const o = el('option', { value }); o.textContent = en; if (viText) o.setAttribute('data-vi', viText); g.append(o); }
+            sel.append(g);
+            titled(sel, label, labelVi);
+            sel.addEventListener('change', () => { if (this.view) { change(sel.value); this.view.focus(); } });
+            return sel;
+        };
+        this.selDir = select('Text direction', 'Hướng chữ', [['h', 'Horizontal', 'Ngang'], ['v', 'Vertical', 'Dọc']], v => this.setSection({ dir: v }));
+        this.selCols = select('Characters per column', 'Số chữ mỗi cột', COLS_OPTIONS.map(n => [String(n), String(n)]), v => this.setSection({ cols: +v }));
         this.bDel = btn(icon('fa-trash'), 'Delete section', 'Xóa phần', () => this.deleteSection());
-        this.bar.append(this.bH1, this.bH2, this.bWari, this.bRuby, sep(), this.bH, this.bV, this.bLess, this.colsNum, this.bMore, sep(), this.bDel);
+        this.bar.append(this.bH1, this.bH2, this.bWari, this.bRuby, sep(), this.selDir, this.selCols, sep(), this.bDel);
 
         // the plus on an empty line (floating, as on Medium): a new section there
         this.plus = el('button', { type: 'button', className: 'scroll-plus', hidden: true });
@@ -430,12 +428,20 @@ const UI = {
         on(this.bRuby, inRuby || (!sel.empty && state.doc.rangeHasMark(sel.from, sel.to, ruby)));
         this.bRuby.disabled = !(inRuby || (!sel.empty && $f.parent === sel.$to.parent && !state.doc.rangeHasMark(sel.from, sel.to, wari)));
         const a = $f.depth >= 1 ? $f.node(1).attrs : null;
-        on(this.bH, a && a.dir === 'h');
-        on(this.bV, a && a.dir === 'v');
         const vert = !!a && a.dir === 'v';
-        this.colsNum.textContent = vert ? a.cols : '–';
-        this.bLess.disabled = !vert || a.cols <= MIN_COLS;
-        this.bMore.disabled = !vert || a.cols >= MAX_COLS;
+        if (a) {
+            this.selDir.value = a.dir;
+            const have = [...this.selCols.options].some(o => o.value === String(a.cols));
+            if (!have) {   // a value from before (or typed by hand) that the list does not have
+                const o = el('option', { value: String(a.cols) }); o.textContent = String(a.cols);
+                const opts = [...this.selCols.options];
+                const at = opts.find(x => +x.value > a.cols);
+                this.selCols.firstChild.insertBefore(o, at || null);
+            }
+            this.selCols.value = String(a.cols);
+        }
+        this.selDir.disabled = !a;
+        this.selCols.disabled = !vert;
         this.bDel.disabled = state.doc.childCount < 2;
         this.position();
 
@@ -457,9 +463,9 @@ const UI = {
             }
         }
     },
-    setSection({ dir, step }) {
+    setSection({ dir, cols }) {
         const view = this.view, sec = sectionAt(view.state.selection.$from), a = sec.node.attrs;
-        const attrs = { ...a, ...(dir ? { dir } : {}), ...(step ? { cols: clampCols(a.cols + step) } : {}) };
+        const attrs = { ...a, ...(dir ? { dir } : {}), ...(cols ? { cols: clampCols(cols) } : {}) };
         if (attrs.dir === a.dir && attrs.cols === a.cols) return;
         view.dispatch(view.state.tr.setNodeMarkup(sec.pos, null, attrs));
     },
@@ -500,7 +506,6 @@ const RubyBox = {
         this.ok = btn(el('i', { className: 'fa-solid fa-check' }), 'Apply', 'Áp dụng', () => this.apply(this.input.value));
         this.del = btn(el('i', { className: 'fa-solid fa-trash' }), 'Remove the ruby', 'Bỏ chú âm', () => this.apply(''));
         this.shown = el('span', { className: 'rt-preview' });
-        this.sugg = el('div', { className: 'rt-sugg' });
         this.kindBtns = Scripts.KINDS.map(([k, label]) => {
             const b = btn(label, { qn: 'Quốc Ngữ', pa: 'PA', qatt: 'QATT' }[k], { qn: 'Quốc Ngữ', pa: 'PA', qatt: 'QATT' }[k], () => this.setKind(k));
             b.dataset.k = k;
@@ -508,12 +513,10 @@ const RubyBox = {
         });
         this.overBtn = btn(el('i', { className: 'bi' }), 'Over (vertical: right)', 'Trên (dọc: bên phải)', () => this.setSide('over'));
         this.underBtn = btn(el('i', { className: 'bi' }), 'Under (vertical: left)', 'Dưới (dọc: bên trái)', () => this.setSide('under'));
-        this.eachBtn = btn(el('i', { className: 'fa-solid fa-wand-magic-sparkles' }), 'Each character its reading from the dictionary', 'Từng chữ theo từ điển', () => this.eachChar());
         this.box = el('div', { className: 'scroll-ui ruby-box', hidden: true },
             el('div', { className: 'rt-row' }, this.input, this.ok, this.del),
             el('div', { className: 'rt-row' }, this.shown),
-            this.sugg,
-            el('div', { className: 'rt-row' }, ...this.kindBtns, el('span', { className: 'sep' }), this.overBtn, this.underBtn, el('span', { className: 'sep' }), this.eachBtn));
+            el('div', { className: 'rt-row' }, ...this.kindBtns, el('span', { className: 'sep' }), this.overBtn, this.underBtn));
         this.box.addEventListener('mousedown', e => { if (e.target !== this.input) e.preventDefault(); });
         document.body.append(this.box);
         document.addEventListener('pointerdown', e => { if (this.isOpen() && !this.box.contains(e.target)) this.close(false); });
@@ -535,25 +538,13 @@ const RubyBox = {
         this.input.value = mark ? (mark.attrs.qn || mark.attrs.rt) : '';
         this.base = state.doc.textBetween(range.from, range.to);
         this.del.hidden = !mark;
-        this.eachBtn.hidden = [...this.base].length < 2;
         this.markKind(); this.markSide();
         this.box.hidden = false;
         this.place();
         this.input.focus();
         this.input.select();
-        this.sugg.replaceChildren();
         if (this.kind !== 'qn') await Scripts.load();
         this.preview();
-        const list = await readingsOf(this.base);
-        if (this.range !== range) return;
-        this.suggestions = list;
-        this.sugg.replaceChildren(...list.slice(0, 12).map(r => {
-            const b = el('button', { type: 'button', className: 'rt-chip', textContent: Scripts.text(r, this.kind) });
-            b.title = r;
-            b.addEventListener('click', () => this.apply(r));
-            return b;
-        }));
-        if (!this.input.value && list.length) { this.input.value = list[0]; this.input.select(); this.preview(); }
         this.place();
     },
     // fixed at the toolbar: under it, on the phone above it
@@ -570,7 +561,6 @@ const RubyBox = {
     },
     markKind() {
         for (const b of this.kindBtns) b.classList.toggle('on', b.dataset.k === this.kind);
-        for (const b of this.sugg.querySelectorAll('.rt-chip')) b.textContent = Scripts.text(b.title, this.kind);
     },
     markSide() {
         const vert = this.view.state.doc.resolve(this.range ? this.range.from : 0).node(1)?.attrs.dir === 'v';
@@ -595,21 +585,6 @@ const RubyBox = {
         this.view.dispatch(tr);
         this.close(true);
     },
-    // each character of the selection gets its own ruby: its first reading in the dictionary
-    async eachChar() {
-        const { from } = this.range, chars = [...this.base];
-        if (this.kind !== 'qn') await Scripts.load();
-        const readings = await Promise.all(chars.map(c => readingsOf(c)));
-        const type = schema.marks.ruby, tr = this.view.state.tr.removeMark(this.range.from, this.range.to, type);
-        let pos = from;
-        chars.forEach((c, i) => {
-            const qn = readings[i][0];
-            if (qn) tr.addMark(pos, pos + c.length, type.create({ rt: Scripts.text(qn, this.kind), qn, side: this.side }));
-            pos += c.length;
-        });
-        this.view.dispatch(tr);
-        this.close(true);
-    },
     close(focus) {
         if (!this.box || this.box.hidden) return;
         this.box.hidden = true;
@@ -625,7 +600,7 @@ const uiPlugin = new Plugin({
     props: { handleDOMEvents: { focus: () => { setTimeout(() => UI.refresh()); return false; }, blur: () => { setTimeout(() => UI.refresh()); return false; } } },
 });
 
-// ---------------------------------------------------------------- ime.js (Telex, Chữ Nôm candidates) on the editor
+// ---------------------------------------------------------------- ime.js (Telex only) on the editor
 // VietIme works on a field; this adapter shows it the text of the block with the caret
 class ImeAdapter {
     constructor(view) { this.view = view; this.imeTarget = view.dom; this.style = {}; this.readOnly = false; this.tagName = 'DIV'; }
@@ -808,17 +783,17 @@ async function start() {
     UI.refresh();
     window.scrollsEditor = editor;   // for tests
 
-    // Telex and the candidates: on unless switched off (kept in this browser)
+    // Telex (no Chữ Nôm candidates in the editor): on unless switched off (kept in this browser)
     const telexBtn = $('telex');
     let telexOn = true;
     try { telexOn = localStorage.getItem('scrollsTelex') !== '0'; } catch (e) { /* default */ }
     const adapter = new ImeAdapter(editor);
-    ime = new VietIme(adapter, { defer: true, telex: telexOn, candidates: telexOn, returnSelect: true });
+    ime = new VietIme(adapter, { defer: true, telex: telexOn, candidates: false });
     adapter.ime = ime;
     const setTelex = on => {
         telexOn = on;
         telexBtn.setAttribute('aria-pressed', on ? 'true' : 'false');
-        ime.update({ telex: on, candidates: on });
+        ime.update({ telex: on, candidates: false });
         if (RubyBox.ime) RubyBox.ime.update({ telex: on, candidates: false });
         try { localStorage.setItem('scrollsTelex', on ? '1' : '0'); } catch (e) { /* only for this page */ }
     };
