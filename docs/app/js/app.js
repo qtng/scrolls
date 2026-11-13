@@ -157,7 +157,7 @@ window.notesApp = { store, ready, flush() } is for the tests.
   });
 
   function showEditor(doc, fresh, shared) {
-    state.shared = !!shared; $('view-editor').classList.toggle('shared', !!shared); $('keep-btn').hidden = !shared;
+    state.shared = !!shared; $('view-editor').classList.toggle('shared', !!shared); $('keep-btn').hidden = $('home-logo').hidden = !shared;
     state.current = doc; state.inStore = !fresh; state.dirty = false;
     closeMenu();
     $('view-list').hidden = true;
@@ -172,7 +172,7 @@ window.notesApp = { store, ready, flush() } is for the tests.
   }
   async function showList() {
     await save();
-    state.current = null; state.shared = false;
+    state.current = null; state.shared = false; $('view-editor').classList.remove('shared');
     closeMenu();
     NomEditor.setEditable(false);
     $('view-editor').hidden = true;
@@ -191,17 +191,22 @@ window.notesApp = { store, ready, flush() } is for the tests.
     if (!doc) { history.replaceState(null, '', '#/'); return showList(); }
     showEditor({ ...doc }, false);
   }
-  // a link of somebody: the document is loaded by its code and shown for reading; the owner of it goes to his own document
+  // a link: the document is loaded by its code and shown for reading (the logo leads to the list when signed in, else to the homepage)
   async function showShared(code) {
     if (state.shared && state.current && state.shared === code) return;
     await save();
     let doc = null;
     try { doc = await DocsSync.shareGet(code); } catch (e) { console.error('Share failed:', e); }
-    if (!doc) { snack('This link is not valid (any more)', 'Liên kết này không (còn) hiệu lực'); history.replaceState(null, '', '#/'); return showList(); }
-    if (state.docs.some(d => d.id === doc.id)) { history.replaceState(null, '', '#/n/' + encodeURIComponent(doc.id)); return route(); }
+    if (!doc) { snack('This link is not valid (any more)', 'Liên kết này không (còn) hiệu lực'); state.invalidLink = true; history.replaceState(null, '', '#/'); return showList(); }
     showEditor(doc, false, true);
     state.shared = code;
+    $('keep-btn').hidden = state.docs.some(d => d.id === doc.id);   // a copy only of somebody else's document
   }
+  $('home-logo').addEventListener('click', e => {
+    if (!DocsSync.user) return;   // not signed in: the link to the homepage
+    e.preventDefault();
+    history.replaceState(null, '', '#/'); route();
+  });
   $('keep-btn').addEventListener('click', async () => {   // a copy in my notes
     const src = state.current; if (!src || !state.shared) return;
     const now = Date.now(), doc = { ...src, id: newId(), created: now, updated: now, synced: 0 };
@@ -341,13 +346,19 @@ window.notesApp = { store, ready, flush() } is for the tests.
   $('set-ime').addEventListener('change', () => { setIme($('set-ime').value, true); NomEditor.focus(); });
   try { setIme(localStorage.getItem(IME_KEY)); } catch (e) { setIme('qn'); }
 
-  // the keyboard covers the lower part of the screen: the editor view ends above it
-  const vv = window.visualViewport;
+  // the keyboard covers the lower part of the screen: the editor view ends above it. Two measures, the larger counts: the visual viewport (what is
+  // left above the keyboard) and, where there is one (Chrome on Android), the keyboard itself (navigator.virtualKeyboard: its height, the page is not resized)
+  const vv = window.visualViewport, vk = navigator.virtualKeyboard || null;
+  if (vk) { try { vk.overlaysContent = true; } catch (e) { /* the viewport measure stays */ } }
   function fitKeyboard() {
-    const inset = vv ? Math.max(0, window.innerHeight - vv.height - vv.offsetTop) : 0;
-    $('view-editor').style.bottom = inset + 'px';
+    const byViewport = vv ? Math.max(0, window.innerHeight - vv.height - vv.offsetTop) : 0;
+    const byKeyboard = vk && vk.boundingRect ? Math.max(0, vk.boundingRect.height) : 0;
+    $('view-editor').style.bottom = Math.round(Math.max(byViewport, byKeyboard)) + 'px';
   }
   if (vv) { vv.addEventListener('resize', fitKeyboard); vv.addEventListener('scroll', fitKeyboard); }
+  if (vk) vk.addEventListener('geometrychange', fitKeyboard);
+  document.addEventListener('focusin', () => setTimeout(fitKeyboard, 350));   // the keyboard comes after the focus: measure again when it is there
+  document.addEventListener('focusout', () => setTimeout(fitKeyboard, 350));
 
   // ----- menus -----
   const MENUS = [['menu-btn', 'menu'], ['list-menu-btn', 'list-menu'], ['style-btn', 'style-menu'], ['size-btn', 'size-menu'], ['share-btn', 'share-menu']];
@@ -523,8 +534,11 @@ window.notesApp = { store, ready, flush() } is for the tests.
     if (byHand) snack('Syncing…', 'Đang đồng bộ…', { sticky: true });
     try {
       await save();
+      const started = Date.now();
       const r = await DocsSync.run(state.docs, state.store, { skip: state.current && state.current.id });
-      state.docs = r.docs;
+      const cur = new Map(state.docs.map(d => [d.id, d]));   // what was typed or made while the sync ran stays (the sync worked on the documents as they were at its start)
+      state.docs = r.docs.map(d => { const c = cur.get(d.id); return c && c.updated > d.updated ? { ...c, synced: d.synced } : d; })
+        .concat(state.docs.filter(c => !r.docs.some(d => d.id === c.id) && c.created >= started));
       if (state.current) { const d = r.docs.find(x => x.id === state.current.id); if (d) state.current.synced = d.synced; }
       if (!state.current && r.changed) renderList();
       if (byHand) snack('Synced', 'Đã đồng bộ');
@@ -669,7 +683,7 @@ window.notesApp = { store, ready, flush() } is for the tests.
     renderAccount();
     if (DocsSync.user) await sync();   // the documents of the account first: a new device shows them at once
     await route();
-    if (state.docs.length === 0 && !state.current) $('new-note').click();   // nothing written yet: straight to the editor
+    if (state.docs.length === 0 && !state.current && !state.invalidLink) $('new-note').click();   // nothing written yet: straight to the editor
     resume();
     app.ready = true;
   })();
