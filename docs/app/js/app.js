@@ -483,7 +483,116 @@ window.notesApp = { store, ready, flush() } is for the tests.
   $('sync-now').addEventListener('click', () => { closeMenu(); sync(true); });
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') sync(); });
 
-  document.addEventListener('gesturestart', e => e.preventDefault());   // Safari ignores user-scalable=no
+  document.addEventListener('gesturestart', e => e.preventDefault());
+
+  // ----- offline: the service worker (sw.js), as in Qatt.org Notes -----
+  // A new version: the app asks the server for sw.js at the start and when it comes to the front, at most every 5 minutes. A changed sw.js (a new CACHE)
+  // installs itself and takes over; the page then saves, notes where it was (the document, editing or not, the scroll) and loads again.
+  const UPDATE_EVERY = 5 * 60 * 1000, CHECKED_KEY = 'nomNotesUpdateCheck', RESUME_KEY = 'nomNotesResume';
+  let registration = null, reloading = false;
+  function checkUpdate(force) {
+    if (!registration) return;
+    const now = Date.now();
+    let last = 0;
+    try { last = +localStorage.getItem(CHECKED_KEY) || 0; } catch (e) { /* every time */ }
+    if (!force && now - last < UPDATE_EVERY) return;
+    try { localStorage.setItem(CHECKED_KEY, String(now)); } catch (e) { /* as above */ }
+    registration.update().catch(() => {});
+  }
+  async function reloadKeepingPlace() {
+    if (reloading) return;
+    reloading = true;
+    await save();
+    try { sessionStorage.setItem(RESUME_KEY, JSON.stringify(state.current ? { id: state.current.id, editing: NomEditor.editable, scroll: $('field').scrollTop } : {})); } catch (e) { /* not kept */ }
+    location.reload();
+  }
+  // the version of the app (the number of its cache, nom-notes-vN of sw.js) and the build of the fonts (fonts/version.json), under the menu of the list
+  async function showVersion() {
+    let v = '';
+    try { v = ((await caches.keys()).map(k => /^nom-notes-v(\d+)$/.exec(k)).filter(Boolean).map(m => +m[1]).sort((a, b) => b - a)[0]) || ''; } catch (e) { /* no cache: no number */ }
+    let fonts = '';
+    try { fonts = JSON.parse(localStorage.qattFontVer).build || ''; } catch (e) { /* no list yet */ }
+    $('version').textContent = Lang.t('Version', 'Phiên bản') + ' ' + (v || '–') + ' · ' + Lang.t('Fonts', 'Phông chữ') + ' ' + (fonts || '–');
+  }
+  let checking = false;
+  async function checkUpdateByHand() {
+    if (checking) return;
+    checking = true;
+    snack('Checking for updates…', 'Đang kiểm tra cập nhật…', { sticky: true });
+    let appNew = false, failed = false;
+    if (registration) {
+      try { const reg = (await registration.update()) || registration; appNew = !!(reg.installing || reg.waiting); } catch (e) { failed = true; }
+    } else failed = true;
+    let fontsNew = false;
+    if (typeof qattFontCheck === 'function') { const r = await qattFontCheck(true); if (r === null) failed = true; else fontsNew = r; }
+    try { localStorage.setItem(CHECKED_KEY, String(Date.now())); } catch (e) { /* as above */ }
+    checking = false;
+    if (appNew) { snack('New version found, updating…', 'Đã tìm thấy phiên bản mới, đang cập nhật…', { sticky: true }); return; }
+    if (fontsNew) { snack('New fonts found, updating…', 'Đã tìm thấy phông chữ mới, đang cập nhật…', { sticky: true }); setTimeout(reloadKeepingPlace, 600); return; }
+    await showVersion();
+    if (failed) snack('Could not check for updates (offline?)', 'Không thể kiểm tra cập nhật (đang ngoại tuyến?)');
+    else snack('You have the latest version', 'Bạn đang dùng phiên bản mới nhất');
+  }
+  $('update-check').addEventListener('click', () => { closeMenu(); checkUpdateByHand(); });
+  // the font versions: the build of the fonts and, per font, the date of its files (UTC); a date later than the first list of this device is marked
+  const fontinfo = $('fontinfo');
+  function fontAge(d) {
+    const ms = Date.now() - Date.parse(d.replace(' ', 'T') + ':00Z');
+    if (!(ms >= 0)) return '0h';
+    const days = Math.floor(ms / 864e5);
+    return days > 0 ? days + 'd' : Math.floor(ms / 36e5) + 'h';
+  }
+  function showFontInfo() {
+    let ver = {};
+    try { ver = JSON.parse(localStorage.qattFontVer) || {}; } catch (e) { /* no list yet */ }
+    const fonts = ver.fonts || {}, base = ver.base || {};
+    $('fontinfo-title').textContent = Lang.t('Fonts', 'Phông chữ') + ' · Build ' + (ver.build || '–') + ' · UTC';
+    const list = $('fontinfo-list');
+    list.textContent = '';
+    for (const f of qattFontsShown()) {
+      const li = document.createElement('li'), name = document.createElement('span'), dates = document.createElement('span');
+      name.className = 'fontinfo-name'; name.textContent = f.label;
+      dates.className = 'fontinfo-dates';
+      const keys = [f.file].concat(f.big ? [f.big] : []);
+      keys.forEach((k, i) => {
+        const line = document.createElement('div'), d = fonts[k];
+        line.textContent = (keys.length > 1 ? (i ? 'Nôm ' : 'QATT ') : '') + (d ? d + ' ' + fontAge(d) : '–');
+        if (d && base[k] !== d) { line.className = 'fontinfo-new'; line.textContent += ' ↑'; }
+        dates.appendChild(line);
+      });
+      li.append(name, dates);
+      list.appendChild(li);
+    }
+    const note = document.createElement('li');
+    note.className = 'fontinfo-note';
+    note.textContent = (ver.at ? Lang.t('Checked', 'Đã kiểm tra') + ' ' + new Date(ver.at).toLocaleString() + ' · ' : '') + Lang.t('↑ = newer than the first list of this device', '↑ = mới hơn danh sách đầu tiên của thiết bị này');
+    list.appendChild(note);
+    list.parentNode.scrollTop = 0;
+    fontinfo.hidden = false;
+  }
+  $('font-list').addEventListener('click', () => { closeMenu(); showFontInfo(); });
+  $('fontinfo-close').addEventListener('click', () => { fontinfo.hidden = true; });
+  fontinfo.addEventListener('click', e => { if (e.target === fontinfo) fontinfo.hidden = true; });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') fontinfo.hidden = true; });
+  $('list-menu-btn').addEventListener('click', showVersion);
+  if ('serviceWorker' in navigator) {
+    const hadController = !!navigator.serviceWorker.controller;   // the first install is no update
+    navigator.serviceWorker.addEventListener('controllerchange', () => { if (hadController) reloadKeepingPlace(); });
+    window.addEventListener('load', () => navigator.serviceWorker.register('sw.js', { scope: './', updateViaCache: 'none' }).then(r => { registration = r; checkUpdate(true); }).catch(() => {}));
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') checkUpdate(false); });
+  }
+  app.checkUpdate = checkUpdate;
+  // after the reload of an update: the same place again, and a word about it
+  function resume() {
+    let place = null;
+    try { place = JSON.parse(sessionStorage.getItem(RESUME_KEY) || 'null'); sessionStorage.removeItem(RESUME_KEY); } catch (e) { /* nothing to resume */ }
+    if (!place) return;
+    if (place.id && state.current && state.current.id === place.id) {
+      if (place.editing) setEditing(true);
+      $('field').scrollTop = place.scroll || 0;
+    }
+    snack('Updated to the latest version', 'Đã cập nhật lên phiên bản mới nhất');
+  }   // Safari ignores user-scalable=no
 
   // ----- start -----
   (async () => {
@@ -495,6 +604,7 @@ window.notesApp = { store, ready, flush() } is for the tests.
     if (DocsSync.user) await sync();   // the documents of the account first: a new device shows them at once
     await route();
     if (state.docs.length === 0 && !state.current) $('new-note').click();   // nothing written yet: straight to the editor
+    resume();
     app.ready = true;
   })();
 })();

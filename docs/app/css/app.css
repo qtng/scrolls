@@ -163,3 +163,19 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .keybar.direct .variants, .keybar.direct .nom-more { display: none !important; }
 .directbar button { min-width: 0; padding: 0; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); font-family: var(--doc-font), system-ui, sans-serif; font-size: 1.5rem; line-height: 1; overflow: hidden; }
 .directbar button:active { background: rgba(255, 255, 255, .12); }
+
+/* the card of the font versions (menu of the list), as in Qatt.org Notes */
+.menu-version { padding: .4rem 1rem .5rem; font-size: .75rem; color: var(--muted); user-select: text; }
+.clip { position: fixed; inset: 0; z-index: 30; display: flex; align-items: center; justify-content: center; padding: 1.25rem calc(1.25rem + env(safe-area-inset-right)) calc(1.25rem + env(safe-area-inset-bottom)) calc(1.25rem + env(safe-area-inset-left)); background: rgba(0, 0, 0, .45); }
+.clip-sheet { display: flex; flex-direction: column; width: 100%; max-width: 560px; max-height: 65vh; max-height: 65dvh; border: 1px solid var(--line); border-radius: 16px; background: var(--menu); box-shadow: 0 8px 28px rgba(0, 0, 0, .65); overflow: hidden; }
+.clip-title { padding: .65rem 1rem .5rem; border-bottom: 1px solid var(--line); font-size: .85rem; letter-spacing: .02em; opacity: .75; }
+.clip-body { flex: 1; min-height: 0; padding: 1rem; overflow-y: auto; display: flex; justify-content: center; }
+.fontinfo-list { width: 100%; margin: 0; padding: 0; list-style: none; }
+.fontinfo-list li { display: flex; align-items: baseline; gap: .75rem; padding: .45rem 0; border-bottom: 1px solid var(--line); }
+.fontinfo-list li:last-child { border-bottom: 0; }
+.fontinfo-name { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.fontinfo-dates { flex: none; font-size: .8rem; color: var(--muted); text-align: right; font-variant-numeric: tabular-nums; line-height: 1.35; }
+.fontinfo-new { color: var(--accent); }
+.fontinfo-note { margin-top: .5rem; font-size: .75rem; color: var(--muted); }
+.clip-actions { display: flex; gap: .5rem; padding: .5rem; border-top: 1px solid var(--line); }
+.clip-actions button { flex: 1 1 0; display: flex; align-items: center; justify-content: center; gap: .5rem; min-height: 48px; border: 1px solid var(--line); border-radius: 12px; background: var(--bg); }

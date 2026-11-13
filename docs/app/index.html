@@ -7,6 +7,9 @@
   <meta name="robots" content="noindex">
   <meta name="theme-color" content="#2d2720">
   <meta name="description" content="Documents in Chữ Nôm, horizontal and vertical.">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <link rel="icon" href="icons/icon-192.png">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
   <link rel="stylesheet" href="../css/prosemirror.css">
   <link rel="stylesheet" href="css/app.css">
@@ -41,6 +44,9 @@
         <div class="menu-sep" role="separator"></div>
         <button id="export" type="button"><i class="fa-solid fa-file-export"></i> <span data-vi="Xuất ghi chú">Export notes</span></button>
         <button id="import" type="button"><i class="fa-solid fa-file-import"></i> <span data-vi="Nhập ghi chú">Import notes</span></button>
+        <button id="font-list" type="button"><i class="fa-solid fa-font"></i> <span data-vi="Phiên bản phông chữ">Font versions</span></button>
+        <button id="update-check" type="button"><i class="fa-solid fa-arrows-rotate"></i> <span data-vi="Kiểm tra cập nhật">Check for updates</span></button>
+        <div id="version" class="menu-version"></div>
       </div>
     </header>
     <div id="search-bar" class="search-bar" hidden><input id="search" type="search" autocomplete="off" spellcheck="false" aria-label="Search" data-vi-aria-label="Tìm kiếm" placeholder="Search" data-vi-placeholder="Tìm kiếm"></div>
@@ -91,6 +97,15 @@
       <div id="directbar" class="directbar" role="group" aria-label="QATT letters" data-vi-aria-label="Chữ QATT"></div>
     </div>
   </section>
+  <div id="fontinfo" class="clip" hidden>
+    <div class="clip-sheet" role="dialog" aria-modal="true" aria-labelledby="fontinfo-title">
+      <div id="fontinfo-title" class="clip-title"></div>
+      <div class="clip-body"><ul id="fontinfo-list" class="fontinfo-list"></ul></div>
+      <div class="clip-actions">
+        <button id="fontinfo-close" type="button"><i class="fa-solid fa-xmark"></i> <span data-vi="Đóng">Close</span></button>
+      </div>
+    </div>
+  </div>
   <div id="snackbar" class="snackbar" role="status" hidden><span id="snackbar-text"></span> <button id="undo" type="button" hidden data-vi="Hoàn tác">Undo</button></div>
 </body>
 </html>
