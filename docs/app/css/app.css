@@ -225,3 +225,10 @@ input.doc-title:focus { border-color: var(--accent); }
 .home-logo { flex: none; display: grid; place-items: center; width: 44px; height: 44px; }
 .home-logo img { width: 36px; height: 36px; border-radius: 8px; }
 #view-editor.shared #back { display: none; }
+
+/* the style of the document covers the whole screen of the document: behind the bars (they stay legible: dark and a little transparent) and the pages */
+#view-editor { background: var(--field-bg, var(--bg)); color: var(--field-ink, var(--ink)); }
+#view-editor .appbar, #view-editor .fmtbar, #view-editor .keybar { background: color-mix(in srgb, var(--bar) 80%, transparent); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); color: var(--ink); }
+#view-editor .doc-title { color: var(--field-ink, var(--ink)); text-shadow: var(--field-shadow, none); }
+#view-editor input.doc-title { background: rgba(0, 0, 0, .12); border-color: color-mix(in srgb, var(--field-ink, var(--ink)) 35%, transparent); }
+.ProseMirror .sec { outline: 1px solid color-mix(in srgb, var(--field-ink, #1b1814) 16%, transparent); }
