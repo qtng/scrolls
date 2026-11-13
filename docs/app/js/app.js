@@ -490,14 +490,14 @@ window.notesApp = { store, ready, flush() } is for the tests.
   // The unit (--unit) is the size of a character of 100%: the page is format.width units wide, the text is fontSize % of a unit. (Later a size of
   // a paragraph or a character can be relative to the text of the document, in em.)
   let zoom = 100;
-  function applySize() {
+  function applySize(relayout = true) {   // a zoom alone needs no new layout: the layout is in em
     const doc = state.current, w = doc && doc.format && doc.format.width > 0 ? doc.format.width : pageWidth();
     // the document fills the width of the screen: smaller where it does not fit, larger where there is room, but at most twice its size
     const fit = Math.min(2, room() / (w * BASE)), unit = BASE * fit * zoom / 100, scale = formatOf(doc).fontSize / 100;
     document.documentElement.style.setProperty('--page-em', String(w));
     document.documentElement.style.setProperty('--unit', unit.toFixed(2) + 'px');
     document.documentElement.style.setProperty('--doc-size', (unit * scale).toFixed(2) + 'px');
-    NomEditor.relayout();
+    if (relayout) NomEditor.relayout();
   }
   const step25 = (v, lo, hi) => Math.min(hi, Math.max(lo, Math.round((Number(v) || 100) / 25) * 25));
   // the zoom: the middle of what is seen stays where it is (a page wider than the screen scrolls sideways); a vertical page begins at its right edge
@@ -509,11 +509,13 @@ window.notesApp = { store, ready, flush() } is for the tests.
     const f = $('field'), r = f.getBoundingClientRect();
     const ax = at ? at.x - r.left : f.clientWidth / 2, ay = at ? at.y - r.top : f.clientHeight / 2;
     const rx = (f.scrollLeft + ax) / Math.max(1, f.scrollWidth), ry = (f.scrollTop + ay) / Math.max(1, f.scrollHeight);
-    applySize();
-    requestAnimationFrame(() => requestAnimationFrame(() => {
+    applySize(false);
+    const place = () => {
       if (user) { f.scrollLeft = rx * f.scrollWidth - ax; f.scrollTop = ry * f.scrollHeight - ay; }
       else if (f.querySelector('.grp.v')) f.scrollLeft = f.scrollWidth;
-    }));
+    };
+    place();   // at once (the new sizes are laid out when they are read), and again when the layout of the pages is done
+    requestAnimationFrame(() => requestAnimationFrame(place));
   };
   // pinch with two fingers on the document (reading), Ctrl + wheel or a pinch on a touchpad: the zoom (the zoom of the browser stays off: it would
   // also enlarge the bars)
@@ -523,13 +525,36 @@ window.notesApp = { store, ready, flush() } is for the tests.
     const later = (value, at) => { next = { value, at }; if (!frame) frame = requestAnimationFrame(() => { frame = 0; setZoom(next.value, true, next.at); }); };
     const spread = t => Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
     const mid = t => ({ x: (t[0].clientX + t[1].clientX) / 2, y: (t[0].clientY + t[1].clientY) / 2 });
-    field.addEventListener('touchstart', e => { if (e.touches.length === 2 && reading()) pinch = { d: spread(e.touches), z: zoom }; }, { passive: true });
+    // while the fingers move the title and the pages are only scaled (a transform: no layout, nothing moves); at the end the zoom is set once
+    const parts = () => [field.querySelector('.doc-head'), $('editor')];
+    const scaleBy = (s, at) => parts().forEach(el => {
+      if (s === 1) { el.style.transform = ''; el.style.transformOrigin = ''; return; }
+      const r = el.getBoundingClientRect();
+      el.style.transformOrigin = `${at.x - r.left}px ${at.y - r.top}px`;
+      el.style.transform = `scale(${s})`;
+    });
+    field.addEventListener('touchstart', e => {
+      if (e.touches.length !== 2 || !reading()) return;
+      pinch = { d: spread(e.touches), z: zoom, at: mid(e.touches), s: 1 };
+      parts().forEach(el => { el.style.willChange = 'transform'; });
+    }, { passive: true });
     field.addEventListener('touchmove', e => {
       if (!pinch || e.touches.length !== 2) return;
       e.preventDefault();
-      later(pinch.z * spread(e.touches) / pinch.d, mid(e.touches));
+      const z = Math.min(300, Math.max(50, pinch.z * spread(e.touches) / pinch.d));
+      pinch.s = z / pinch.z;
+      if (!frame) frame = requestAnimationFrame(() => { frame = 0; if (pinch) scaleBy(pinch.s, pinch.at); });
     }, { passive: false });
-    field.addEventListener('touchend', e => { if (e.touches.length < 2) pinch = null; });
+    const endPinch = () => {
+      if (!pinch) return;
+      const { z, s, at } = pinch;
+      pinch = null;
+      cancelAnimationFrame(frame); frame = 0;
+      parts().forEach(el => { el.style.transform = ''; el.style.transformOrigin = ''; el.style.willChange = ''; });
+      if (s !== 1) setZoom(z * s, true, at);
+    };
+    field.addEventListener('touchend', e => { if (e.touches.length < 2) endPinch(); });
+    field.addEventListener('touchcancel', endPinch);
     field.addEventListener('wheel', e => {
       if (!e.ctrlKey || !reading()) return;
       e.preventDefault();
