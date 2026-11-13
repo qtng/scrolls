@@ -405,9 +405,13 @@ const UI = {
         const vw = vv ? vv.width : innerWidth, vh = vv ? vv.height : innerHeight, ox = vv ? vv.offsetLeft : 0, oy = vv ? vv.offsetTop : 0;
         box.classList.add('docked');
         box.style.left = Math.max(ox + 8, ox + (vw - w) / 2) + 'px';
-        // above the bottom bar of the site (phone), if it is shown (it hides itself while the keyboard is open)
-        const bar = document.querySelector('.bottom-bar'), barTop = bar && getComputedStyle(bar).display !== 'none' ? bar.getBoundingClientRect().top : Infinity;
-        box.style.top = Math.max(oy + 8, Math.min(oy + vh, barTop) - h - 10) + 'px';
+        // above the bottom bar of the site (phone): the bar itself if it is shown, else the room that the page keeps for it (body.has-bottom-bar:
+        // 60px + the safe area); a bar that is not measured exactly must not cover the menu, so there is some room more
+        const bar = document.querySelector('.bottom-bar');
+        let barTop = Infinity;
+        if (bar && getComputedStyle(bar).display !== 'none') barTop = Math.min(bar.getBoundingClientRect().top, oy + vh - bar.offsetHeight);
+        else if (document.body.classList.contains('has-bottom-bar') && !bar?.classList.contains('typing')) barTop = oy + vh - 76;
+        box.style.top = Math.max(oy + 8, Math.min(oy + vh, barTop) - h - 24) + 'px';
     },
     place(box, left, top) {
         if (this.coarse && box !== this.plus && box !== this.plusMenu) return this.dock(box);
