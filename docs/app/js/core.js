@@ -10,6 +10,7 @@ style: the css of its style (background, color, text-shadow) as base64 (styles.j
   DocsCore.exportJSON(docs)                  the file { app: 'nom-notes', version: 1, docs }
   DocsCore.parseImport(json)                 { ok: true, docs } or { ok: false, error }; one bad document refuses the file
   DocsCore.merge(existing, incoming)         by id, the larger `updated` wins: { docs, added, updated }
+  DocsCore.textOf(content)                   the plain text of the ProseMirror JSON (one block a line)
 */
 const DocsCore = (() => {
   const cleanFormat = f => {
@@ -63,6 +64,16 @@ const DocsCore = (() => {
     }
     return { docs: Array.from(byId.values()).sort((a, b) => b.updated - a.updated), added, updated };
   };
-  return { title, preview, fold, matches, exportJSON, parseImport, merge };
+  const textOf = content => {
+    const lines = [];
+    const walk = n => {
+      if (!n || typeof n !== 'object') return;
+      if (n.type === 'paragraph' || n.type === 'heading') { lines.push((n.content || []).map(c => (typeof c.text === 'string' ? c.text : '')).join('')); return; }
+      (n.content || []).forEach(walk);
+    };
+    walk(content);
+    return lines.join('\n');
+  };
+  return { title, preview, fold, matches, exportJSON, parseImport, merge, textOf };
 })();
 if (typeof module !== 'undefined') module.exports = DocsCore;

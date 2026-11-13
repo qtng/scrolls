@@ -20,6 +20,10 @@
   <script src="js/styles.js"></script>
   <script src="js/core.js"></script>
   <script src="js/db.js"></script>
+  <script src="https://qatt.org/vendor/supabase/supabase.min.js"></script>
+  <script src="https://qatt.org/js/supabase.js"></script>
+  <script src="https://qatt.org/js/login.js"></script>
+  <script src="js/sync.js"></script>
   <script src="js/input.js"></script>
   <script src="js/editor.js"></script>
   <script src="js/app.js" defer></script>
@@ -32,6 +36,9 @@
       <button id="search-toggle" class="icon-btn" type="button" aria-label="Search" data-vi-aria-label="Tìm kiếm"><i class="fa-solid fa-magnifying-glass"></i></button>
       <button id="list-menu-btn" class="icon-btn" type="button" aria-label="Menu" data-vi-aria-label="Menu" aria-haspopup="true" aria-expanded="false"><i class="fa-solid fa-ellipsis-vertical"></i></button>
       <div id="list-menu" class="menu" hidden>
+        <button id="account-btn" type="button"><i class="fa-solid fa-user"></i> <span id="account-label" data-vi="Đăng nhập để đồng bộ">Sign in to sync</span></button>
+        <button id="sync-now" type="button" hidden><i class="fa-solid fa-rotate"></i> <span data-vi="Đồng bộ ngay">Sync now</span></button>
+        <div class="menu-sep" role="separator"></div>
         <button id="export" type="button"><i class="fa-solid fa-file-export"></i> <span data-vi="Xuất ghi chú">Export notes</span></button>
         <button id="import" type="button"><i class="fa-solid fa-file-import"></i> <span data-vi="Nhập ghi chú">Import notes</span></button>
       </div>

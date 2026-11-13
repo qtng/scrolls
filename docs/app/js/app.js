@@ -1,6 +1,6 @@
 /*
 Nôm Notes: the list, the editor view, the saving (taken over from Qatt.org Notes, notes.js; the editor is the one of Scrolls, editor.js).
-Needs lang.js, parser.js, qatt-text.js, pa-text.js, ime.js, fonts.js, prosemirror.js, styles.js, core.js, db.js, input.js, editor.js.
+Needs supabase.js and login.js of qatt.org, sync.js, lang.js, parser.js, qatt-text.js, pa-text.js, ime.js, fonts.js, prosemirror.js, styles.js, core.js, db.js, input.js, editor.js.
 Routes (history, so the back button of Android works): "#/" the list, "#/n/<id>" a document. A new document is written to the store at its first autosave that is not empty.
 window.notesApp = { store, ready, flush() } is for the tests.
 */
@@ -86,6 +86,7 @@ window.notesApp = { store, ready, flush() } is for the tests.
         const i = state.docs.findIndex(d => d.id === copy.id);
         if (i < 0) state.docs.push(copy); else state.docs[i] = copy;
         askPersist();
+        syncSoon();
       } catch (e) { warnUnsaved(); }
     });
     return saving;
@@ -431,6 +432,7 @@ window.notesApp = { store, ready, flush() } is for the tests.
     await saving;   // a save that is already running ends before the document is removed
     if (wasStored) {
       try { await state.store.remove(doc.id); } catch (e) { warnUnsaved(); }
+      if (doc.synced) DocsSync.forget(doc.id);
       state.docs = state.docs.filter(d => d.id !== doc.id);
     }
     if (/\S/.test(snapshot.text) || wasStored) { snack('Deleted', 'Đã xóa', { undo: true }); deleted = snapshot; }
@@ -440,10 +442,46 @@ window.notesApp = { store, ready, flush() } is for the tests.
     const doc = deleted;
     if (!doc) return;
     hideSnack();
+    DocsSync.unforget(doc.id);
     try { await state.store.put(doc); } catch (e) { warnUnsaved(); }
     state.docs.push(doc);
     renderList();
   });
+
+  // ----- the account: signed in, the documents are synced with it (sync.js) -----
+  let syncing = false, syncTimer = 0;
+  function syncSoon() { if (!DocsSync.user) return; clearTimeout(syncTimer); syncTimer = setTimeout(sync, 4000); }
+  async function sync(byHand) {
+    if (!DocsSync.user || syncing) return;
+    syncing = true;
+    if (byHand) snack('Syncing…', 'Đang đồng bộ…', { sticky: true });
+    try {
+      await save();
+      const r = await DocsSync.run(state.docs, state.store, { skip: state.current && state.current.id });
+      state.docs = r.docs;
+      if (state.current) { const d = r.docs.find(x => x.id === state.current.id); if (d) state.current.synced = d.synced; }
+      if (!state.current && r.changed) renderList();
+      if (byHand) snack('Synced', 'Đã đồng bộ');
+    } catch (e) {
+      console.error('Sync failed:', e);
+      if (byHand) snack('Could not sync (offline?)', 'Không đồng bộ được (đang ngoại tuyến?)');
+    } finally { syncing = false; }
+  }
+  function renderAccount() {
+    const u = DocsSync.user, label = $('account-label');
+    if (u) { label.setAttribute('data-vi', 'Đăng xuất (' + (u.email || '') + ')'); label.textContent = 'Sign out (' + (u.email || '') + ')'; }
+    else { label.setAttribute('data-vi', 'Đăng nhập để đồng bộ'); label.textContent = 'Sign in to sync'; }
+    $('sync-now').hidden = !u;
+  }
+  $('account-btn').addEventListener('click', async () => {
+    closeMenu();
+    if (!DocsSync.user) { if (DocsSync.service && window.QattLogin) QattLogin.open(DocsSync.service, { en: 'Sign in to keep your notes in your account and on every device.', vi: 'Đăng nhập để lưu ghi chú trong tài khoản và trên mọi thiết bị.' }); return; }
+    if (!confirm(Lang.t('Sign out? The notes stay in this browser.', 'Đăng xuất? Các ghi chú vẫn ở trong trình duyệt này.'))) return;
+    await DocsSync.signOut();
+    renderAccount();
+  });
+  $('sync-now').addEventListener('click', () => { closeMenu(); sync(true); });
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') sync(); });
 
   document.addEventListener('gesturestart', e => e.preventDefault());   // Safari ignores user-scalable=no
 
@@ -452,6 +490,9 @@ window.notesApp = { store, ready, flush() } is for the tests.
     try { state.store = await DocsDB.open(); state.docs = await state.store.all(); }
     catch (e) { state.store = DocsDB.memory(); warnUnsaved(); }
     app.store = state.store;
+    await DocsSync.init();
+    renderAccount();
+    if (DocsSync.user) await sync();   // the documents of the account first: a new device shows them at once
     await route();
     if (state.docs.length === 0 && !state.current) $('new-note').click();   // nothing written yet: straight to the editor
     app.ready = true;
