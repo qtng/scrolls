@@ -518,19 +518,23 @@ window.notesApp = { store, ready, flush() } is for the tests.
     if (relayout) NomEditor.relayout();
   }
   const step25 = (v, lo, hi) => Math.min(hi, Math.max(lo, Math.round((Number(v) || 100) / 25) * 25));
-  // the zoom: the middle of what is seen stays where it is (a page wider than the screen scrolls sideways); a vertical page begins at its right edge
   // the zoom: the point of the document under `at` (client coordinates; default the middle of the field) stays where it is; on opening a vertical
   // page begins at its right edge (a page wider than the screen scrolls sideways)
   const setZoom = (value, user, at) => {
     zoom = Math.min(300, Math.max(50, Number(value) || 100));   // continuous (the font size moves in steps)
     $('read-zoom').value = zoom;
-    const f = $('field'), r = f.getBoundingClientRect();
-    const ax = at ? at.x - r.left : f.clientWidth / 2, ay = at ? at.y - r.top : f.clientHeight / 2;
-    const rx = (f.scrollLeft + ax) / Math.max(1, f.scrollWidth), ry = (f.scrollTop + ay) / Math.max(1, f.scrollHeight);
+    const f = $('field'), fr = f.getBoundingClientRect(), ed = $('editor');
+    const p0 = at || { x: fr.left + f.clientWidth / 2, y: fr.top + f.clientHeight / 2 };
+    const unitNow = () => parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--unit')) || BASE;
+    const r0 = ed.getBoundingClientRect(), u0 = unitNow();
+    const ux = (p0.x - r0.left) / u0, uy = (p0.y - r0.top) / u0;   // the point in units of the pages
     applySize(false);
     const place = () => {
-      if (user) { f.scrollLeft = rx * f.scrollWidth - ax; f.scrollTop = ry * f.scrollHeight - ay; }
-      else if (f.querySelector('.grp.v')) f.scrollLeft = f.scrollWidth;
+      if (user) {   // the same point of the pages under p0 again
+        const r1 = ed.getBoundingClientRect(), u1 = unitNow();
+        f.scrollLeft += r1.left + ux * u1 - p0.x;
+        f.scrollTop += r1.top + uy * u1 - p0.y;
+      } else if (f.querySelector('.grp.v')) f.scrollLeft = f.scrollWidth;
     };
     place();   // at once (the new sizes are laid out when they are read), and again when the layout of the pages is done
     requestAnimationFrame(() => requestAnimationFrame(place));
@@ -545,23 +549,24 @@ window.notesApp = { store, ready, flush() } is for the tests.
     const mid = t => ({ x: (t[0].clientX + t[1].clientX) / 2, y: (t[0].clientY + t[1].clientY) / 2 });
     // while the fingers move the title and the pages are only scaled (a transform: no layout, nothing moves); at the end the zoom is set once
     const parts = () => [field.querySelector('.doc-head'), $('editor')];
-    const scaleBy = (s, at) => parts().forEach(el => {
-      if (s === 1) { el.style.transform = ''; el.style.transformOrigin = ''; return; }
+    // the origin of each part is set once at the start of a gesture, from its place unscaled (a box measured while scaled would move the origin)
+    const origin = at => parts().forEach(el => {
+      el.style.transform = ''; el.style.willChange = 'transform';
       const r = el.getBoundingClientRect();
       el.style.transformOrigin = `${at.x - r.left}px ${at.y - r.top}px`;
-      el.style.transform = `scale(${s})`;
     });
+    const scaleBy = s => parts().forEach(el => { el.style.transform = s === 1 ? '' : `scale(${s})`; });
     field.addEventListener('touchstart', e => {
       if (e.touches.length !== 2 || !reading()) return;
       pinch = { d: spread(e.touches), z: zoom, at: mid(e.touches), s: 1 };
-      parts().forEach(el => { el.style.willChange = 'transform'; });
+      origin(pinch.at);
     }, { passive: true });
     field.addEventListener('touchmove', e => {
       if (!pinch || e.touches.length !== 2) return;
       e.preventDefault();
       const z = Math.min(300, Math.max(50, pinch.z * spread(e.touches) / pinch.d));
       pinch.s = z / pinch.z;
-      if (!frame) frame = requestAnimationFrame(() => { frame = 0; if (pinch) scaleBy(pinch.s, pinch.at); });
+      if (!frame) frame = requestAnimationFrame(() => { frame = 0; if (pinch) scaleBy(pinch.s); });
     }, { passive: false });
     const endPinch = () => {
       if (!pinch) return;
@@ -576,9 +581,9 @@ window.notesApp = { store, ready, flush() } is for the tests.
     const slider = $('read-zoom'), centre = () => { const r = field.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; };
     let drag = null;
     slider.addEventListener('input', () => {
-      if (!drag) { drag = { z: zoom, at: centre() }; parts().forEach(el => { el.style.willChange = 'transform'; }); }
+      if (!drag) { drag = { z: zoom, at: centre() }; origin(drag.at); }
       const s = Math.min(300, Math.max(50, +slider.value)) / drag.z;
-      if (!frame) frame = requestAnimationFrame(() => { frame = 0; if (drag) scaleBy(s, drag.at); });
+      if (!frame) frame = requestAnimationFrame(() => { frame = 0; if (drag) scaleBy(s); });
     });
     slider.addEventListener('change', () => {
       const d = drag; drag = null;
