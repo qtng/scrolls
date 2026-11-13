@@ -132,6 +132,33 @@ function insertSection(view, dir) {
 // ---------------------------------------------------------------- two-column text and bands: the layout
 const layoutKey = new PluginKey('layout');
 
+// The segments of a run of two-column text (chars: code points). The grid of the old prints: it takes whole cells; the first segment fills
+// the rest of the column, the next ones whole columns, the last one is balanced (the right line gets the extra character); half a cell left over stays empty.
+// from/to are offsets in UTF-16 units from the start of the run.
+function segments(chars, offset, len, half) {
+    const cell = 2 * half, tol = half * 0.05;
+    let startPad = Math.ceil((offset - tol) / cell) * cell - offset;
+    if (startPad < tol) startPad = 0;
+    const fit = px => Math.floor((px + tol) / half);
+    let perLine = fit(len - offset - startPad);
+    if (perLine < 1) { perLine = fit(len); startPad = 0; }
+    const full = Math.max(1, fit(len));
+    const out = [];
+    let i = 0, u = 0, cap = 2 * Math.max(1, perLine);
+    while (i < chars.length) {
+        const take = Math.min(cap, chars.length - i);
+        const units = chars.slice(i, i + take).join('').length;
+        const line = Math.ceil(take / 2);
+        let style = `inline-size: ${line}em;`;
+        if (line % 2) style += ' padding-inline-end: 1em;';
+        if (!out.length && startPad) style += ` margin-inline-start: ${startPad.toFixed(2)}px;`;
+        out.push({ from: u, to: u + units, style });
+        i += take; u += units;
+        cap = 2 * full;
+    }
+    return out;
+}
+
 // the runs of two-column text: [{ from, to, text }] in document order
 function wariRuns(doc) {
     const runs = [], mark = schema.marks.warichu;
