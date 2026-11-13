@@ -116,7 +116,8 @@ button { font: inherit; color: inherit; cursor: pointer; }
 /* two-column text: segments set by editor.js (half size, two lines = one line of the main text, whole cells) */
 .ProseMirror .wari { opacity: .8; }
 .ProseMirror .seg { display: inline-block; box-sizing: content-box; font-size: .5em; line-height: 1; block-size: 2em; vertical-align: text-top; line-break: anywhere; word-break: break-all; }
-.ProseMirror .grp.v .seg { position: relative; left: calc(-1 * var(--seg-shift, 0px)); }   /* on the axis of the column (editor.js measures how far it lies beside it) */
+.ProseMirror .grp.v .seg { position: relative; left: calc(-1 * var(--seg-shift, 0px)); }
+.ProseMirror .grp.h .seg { position: relative; top: calc(-1 * var(--seg-shift, 0px)); }   /* horizontal: on the middle of the line */   /* on the axis of the column (editor.js measures how far it lies beside it) */
 .ProseMirror .mk { display: inline-block; inline-size: 0; block-size: 1em; }
 .ProseMirror .is-empty::before { content: attr(data-placeholder); position: absolute; opacity: .5; pointer-events: none; }
 /* ruby: the base keeps its cell; the reading sits beside it (horizontal: over / under, vertical: right / left), narrowed along the line by editor.js (--rs) */
