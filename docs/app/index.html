@@ -20,6 +20,7 @@
   <script src="js/styles.js"></script>
   <script src="js/core.js"></script>
   <script src="js/db.js"></script>
+  <script src="js/input.js"></script>
   <script src="js/editor.js"></script>
   <script src="js/app.js" defer></script>
 </head>
@@ -62,7 +63,10 @@
       <button id="undo-btn" type="button" disabled aria-label="Undo" data-vi-aria-label="Hoàn tác" title="Undo" data-vi-title="Hoàn tác"><span class="uni" aria-hidden="true">↶</span></button>
       <button id="redo-btn" type="button" disabled aria-label="Redo" data-vi-aria-label="Làm lại" title="Redo" data-vi-title="Làm lại"><span class="uni" aria-hidden="true">↷</span></button>
       <select id="set-ime" class="ime-select" autocomplete="off" aria-label="Input" data-vi-aria-label="Cách nhập" title="Input" data-vi-title="Cách nhập">
-        <option value="telex" data-vi="Telex">Telex</option>
+        <option value="qn" data-vi="Quốc Ngữ">Quốc Ngữ</option>
+        <option value="qatt" data-vi="QATT Telex">QATT Telex</option>
+        <option value="pa" data-vi="PA Telex">PA Telex</option>
+        <option value="direct" data-vi="QATT nhập trực tiếp">QATT direct input</option>
         <option value="off" data-vi="Không Telex">No Telex</option>
       </select>
       <span id="toolbar" class="tools"></span>
@@ -74,6 +78,11 @@
       </span>
     </div>
     <div id="field" class="field"><div id="editor"></div></div>
+    <div id="keybar" class="keybar" hidden>
+      <span class="variants" role="group" aria-label="Chữ Nôm candidates and variants of the characters before the cursor" data-vi-aria-label="Gợi ý Chữ Nôm và biến thể của các ký tự trước con trỏ"><button type="button" class="variant" disabled>·</button><button type="button" class="variant" disabled>·</button><button type="button" class="variant" disabled>·</button><button type="button" class="variant" disabled>·</button><button type="button" class="variant" disabled>·</button><button type="button" class="variant" disabled>·</button><button type="button" class="variant" disabled>·</button><button type="button" class="variant" disabled>·</button><button type="button" class="variant" disabled>·</button><button type="button" class="variant" disabled>·</button><button id="nom-more-btn" type="button" class="more" disabled aria-expanded="false" aria-controls="nom-more" aria-label="More Chữ Nôm candidates" data-vi-aria-label="Thêm gợi ý Chữ Nôm" title="More Chữ Nôm candidates" data-vi-title="Thêm gợi ý Chữ Nôm"><i class="fa-solid fa-caret-up"></i></button></span>
+      <div id="nom-more" class="nom-more" hidden></div>
+      <div id="directbar" class="directbar" role="group" aria-label="QATT letters" data-vi-aria-label="Chữ QATT"></div>
+    </div>
   </section>
   <div id="snackbar" class="snackbar" role="status" hidden><span id="snackbar-text"></span> <button id="undo" type="button" hidden data-vi="Hoàn tác">Undo</button></div>
 </body>

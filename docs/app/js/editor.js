@@ -776,16 +776,17 @@ const imeKeys = new Plugin({
 });
 
 // ---------------------------------------------------------------- the API for the app (app.js)
-// NomEditor.mount(element, toolbar)   once: the view in `element`, the buttons in `toolbar`
+// NomEditor.mount(element, toolbar, extra)   once: the view in `element`, the buttons in `toolbar`, more plugins first (the input)
 // NomEditor.open(content, onChange)   a document (its JSON, or null for a new one); onChange() after every change of the document
 // NomEditor.json(), .text()           the document as JSON, its text (blocks on lines of their own)
 // NomEditor.setEditable(on), .editable, .focus(), .undo(), .redo(), .canUndo(), .canRedo(), .setTelex(on), .relayout()
 let view = null, changed = null, editable = false;
 const NomEditor = {
     schema, upgrade, emptyDoc,
-    mount(element, toolbar) {
+    mount(element, toolbar, extra = []) {
         UI.init(toolbar);
         const plugins = [
+            ...extra,   // the input (input.js) first: its keys before the keymaps
             imeKeys,
             keymap({
                 'Mod-z': undo, 'Shift-Mod-z': redo, 'Mod-y': redo,

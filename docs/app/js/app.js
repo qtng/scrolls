@@ -1,6 +1,6 @@
 /*
 Nôm Notes: the list, the editor view, the saving (taken over from Qatt.org Notes, notes.js; the editor is the one of Scrolls, editor.js).
-Needs lang.js, parser.js, qatt-text.js, ime.js, fonts.js, prosemirror.js, styles.js, core.js, db.js, editor.js.
+Needs lang.js, parser.js, qatt-text.js, pa-text.js, ime.js, fonts.js, prosemirror.js, styles.js, core.js, db.js, input.js, editor.js.
 Routes (history, so the back button of Android works): "#/" the list, "#/n/<id>" a document. A new document is written to the store at its first autosave that is not empty.
 window.notesApp = { store, ready, flush() } is for the tests.
 */
@@ -94,7 +94,7 @@ window.notesApp = { store, ready, flush() } is for the tests.
   window.addEventListener('pagehide', () => { save(); });
 
   // ----- editor -----
-  NomEditor.mount($('editor'), $('toolbar'));
+  NomEditor.mount($('editor'), $('toolbar'), [NomInput.plugin]);
   const edited = () => { schedule(); showTitle(); buttons(); };
   const showTitle = () => { $('editor-title').textContent = DocsCore.title(NomEditor.text(), state.current && state.current.title); };
   function buttons() { $('undo-btn').disabled = !NomEditor.editable || !NomEditor.canUndo(); $('redo-btn').disabled = !NomEditor.editable || !NomEditor.canRedo(); }
@@ -135,6 +135,7 @@ window.notesApp = { store, ready, flush() } is for the tests.
     $('edit-btn').setAttribute('aria-label', on ? Lang.t('Done', 'Xong') : Lang.t('Edit', 'Chỉnh sửa'));
     $('view-editor').classList.toggle('reading', !on);
     buttons();
+    renderKeys();
   }
   $('edit-btn').addEventListener('click', () => { const on = !NomEditor.editable; setEditing(on); if (on) NomEditor.focus(); else save(); });
   let lastTap = { t: 0, x: 0, y: 0 };
@@ -200,16 +201,79 @@ window.notesApp = { store, ready, flush() } is for the tests.
     else { history.replaceState(null, '', '#/'); route(); }
   });
 
-  // the input (for every document): Telex (Quốc Ngữ) or none
-  const IME_KEY = 'nomNotesIme';
+  // ----- key bar: slots: the word in the other script (QATT Telex: PA, PA Telex: QATT), then the Chữ Nôm candidates of the word before the caret
+  // (more of them in a list above the bar, opened by the narrow button with the triangle), else the variants of the QATT characters before it.
+  // It sits above the keyboard (the editor view ends at the top of the keyboard), while a document is edited. -----
+  const keybar = $('keybar'), slotBtns = Array.from(document.querySelectorAll('#keybar .variant')), moreBtn = $('nom-more-btn'), morePanel = $('nom-more');
+  let shownKeys = null, shown = [], rest = [], slots = 0;
+  function fitSlots() {   // the number of slots follows the width of the bar: 5 on a phone, up to 10 on a wide screen
+    const n = Math.max(5, Math.min(slotBtns.length, Math.floor((keybar.clientWidth - 60) / 62)));
+    if (!keybar.clientWidth || n === slots) return;
+    slots = n; shownKeys = null;
+    slotBtns.forEach((btn, i) => { btn.hidden = i >= n; });
+  }
+  function showMore(on) {
+    morePanel.hidden = !on;
+    moreBtn.setAttribute('aria-expanded', String(on));
+    if (!on) return;
+    morePanel.replaceChildren(...rest.map((c, j) => {
+      const btn = document.createElement('button');
+      btn.type = 'button'; btn.textContent = c.glyph; btn.title = c.reading;
+      btn.addEventListener('pointerdown', keepFocus);
+      btn.addEventListener('click', () => { const now = rest[j]; showMore(false); if (now) now.run(); });
+      return btn;
+    }));
+    morePanel.scrollTop = 0;
+  }
+  function renderKeys() {
+    keybar.hidden = !NomEditor.editable || !state.current;
+    if (keybar.hidden) { showMore(false); return; }
+    fitSlots();
+    const alt = NomInput.alternate(), nom = NomInput.candidates(), list = alt ? [alt, ...nom] : nom;
+    shown = list.length ? list.slice(0, slots) : [];
+    if (!list.length) NomInput.variants().forEach((v, i) => { shown[i] = v; });
+    rest = list.slice(slots);
+    const key = (list.length ? 'n' : 'v') + slotBtns.map((b, i) => (shown[i] ? shown[i].glyph || shown[i].id + shown[i].view : '')).join() + '|' + rest.length;
+    if (key === shownKeys) return;
+    shownKeys = key;
+    slotBtns.forEach((btn, i) => {
+      const v = shown[i];
+      btn.disabled = !v;
+      btn.classList.toggle('nom', !!(v && v.glyph && !v.script));
+      btn.textContent = v ? v.glyph || v.view : '·';
+      btn.title = !v ? '' : v.script ? (v.script === 'pa' ? 'PA' : 'QATT') : v.glyph ? v.reading : Lang.t(v.en, v.vi);
+    });
+    moreBtn.disabled = !rest.length;
+    showMore(false);
+  }
+  const keepFocus = e => e.preventDefault();   // a click on the bar does not take the focus (and the keyboard) from the text
+  slotBtns.forEach((btn, i) => { btn.addEventListener('pointerdown', keepFocus); btn.addEventListener('click', () => { const v = shown[i]; if (v) v.run(); }); });
+  moreBtn.addEventListener('pointerdown', keepFocus);
+  moreBtn.addEventListener('click', () => showMore(morePanel.hidden));
+  if (window.VietIme) VietIme.load().then(() => { shownKeys = null; renderKeys(); }).catch(() => {});
+  NomInput.onUpdate = renderKeys;
+  window.addEventListener('resize', () => { shownKeys = null; renderKeys(); });
+  document.addEventListener('langchange', () => { shownKeys = null; renderKeys(); });
+
+  // the input (for every document, kept in this browser): Quốc Ngữ, QATT Telex, PA Telex, QATT direct input (a bar of the 22 shapes; digits 1–8 are tones) or none
+  const IME_KEY = 'nomNotesIme', directbar = $('directbar');
+  directbar.append(...VietnameseParser.SHAPES.map((shape, k) => {
+    const btn = document.createElement('button');
+    btn.type = 'button'; btn.textContent = NomInput.shapes[k]; btn.title = shape === 'z' ? '_' : shape;
+    btn.addEventListener('pointerdown', keepFocus);
+    btn.addEventListener('click', () => NomInput.typeShape(k));
+    return btn;
+  }));
   function setIme(mode, keep) {
-    mode = mode === 'off' ? 'off' : 'telex';
-    NomEditor.setTelex(mode === 'telex');
+    mode = NomInput.setMode(mode);
+    NomEditor.setTelex(NomInput.telexOn());
+    keybar.classList.toggle('direct', mode === 'direct');
     $('set-ime').value = mode;
+    shownKeys = null; renderKeys();
     if (keep) try { localStorage.setItem(IME_KEY, mode); } catch (e) { /* not kept */ }
   }
   $('set-ime').addEventListener('change', () => { setIme($('set-ime').value, true); NomEditor.focus(); });
-  try { setIme(localStorage.getItem(IME_KEY)); } catch (e) { setIme('telex'); }
+  try { setIme(localStorage.getItem(IME_KEY)); } catch (e) { setIme('qn'); }
 
   // the keyboard covers the lower part of the screen: the editor view ends above it
   const vv = window.visualViewport;
@@ -339,15 +403,17 @@ window.notesApp = { store, ready, flush() } is for the tests.
   };
   $('set-size').addEventListener('input', () => setSize($('set-size').value, true));
 
-  // the rhyme table of the document (the readings in QATT: the ruby, later the input)
+  // the rhyme table of the document: the QATT input, the QATT readings of the ruby
   for (const [name, label, vi] of VietnameseParser.TABLES) { const o = new Option(label, name); o.setAttribute('data-vi', vi); $('set-decoding').append(o); }
-  function useDecoding(name) {
+  function useDecoding(name, recode) {
     const select = $('set-decoding');
     if (!Array.from(select.options).some(o => o.value === name)) name = 'qatt';
     select.value = name;
+    NomInput.setDecoding(name, recode);   // with recode: every QATT cell is written again after the new table
     NomEditor.setDecoding(name);
+    parser.setDecoding(name);
   }
-  $('set-decoding').addEventListener('change', () => { keepFormat('decoding', $('set-decoding').value); useDecoding($('set-decoding').value); closeMenu(); });
+  $('set-decoding').addEventListener('change', () => { keepFormat('decoding', $('set-decoding').value); useDecoding($('set-decoding').value, true); closeMenu(); });
 
   function applyFormat(doc) {
     const f = formatOf(doc);

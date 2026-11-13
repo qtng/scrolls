@@ -143,3 +143,23 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .ruby-box .rt-input { flex: 1 1 auto; min-width: 0; height: 2.2rem; padding: 0 .5rem; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--ink); font-size: 1rem; outline: 0; }
 .ruby-box .rt-input:focus { border-color: var(--accent); }
 .ruby-box .rt-preview { font-family: var(--doc-font), var(--nom), serif; font-size: 1.15rem; padding: 0 .3rem; min-height: 1.2em; }
+
+/* the key bar above the keyboard (as in Qatt.org Notes): slots of flexible width, centred; the narrow button with the triangle opens the other candidates */
+.keybar { position: relative; flex: none; display: flex; align-items: center; gap: .4rem; padding: .4rem .5rem calc(.4rem + env(safe-area-inset-bottom)); background: var(--bar); border-top: 1px solid var(--line); }
+.variants { flex: 1; min-width: 0; display: flex; justify-content: center; gap: .3rem; }
+.variant, .more { min-height: 48px; border: 1px solid var(--line); border-radius: 12px; background: var(--bg); }
+.variant { flex: 1 1 0; min-width: 0; max-width: 64px; padding: 0; overflow: hidden; white-space: nowrap; font-family: var(--doc-font), var(--nom), system-ui, sans-serif; font-size: 1.6rem; line-height: 1; }
+.more { flex: 0 0 28px; padding: 0; font-size: .8rem; }
+.variant:disabled, .more:disabled { opacity: .35; }
+.variant:not(:disabled):active, .more:not(:disabled):active, .nom-more button:active { background: rgba(255, 255, 255, .12); }
+.more[aria-expanded="true"] { color: var(--accent); border-color: var(--accent); }
+.variant.nom, .nom-more button { font-family: var(--doc-font), var(--nom), serif; }
+.nom-more { position: absolute; z-index: 5; left: .5rem; right: .5rem; bottom: 100%; max-height: 40vh; max-height: 40dvh; overflow-y: auto; display: grid; grid-template-columns: repeat(auto-fill, minmax(48px, 1fr)); gap: .3rem; padding: .4rem;
+  background: rgba(58, 51, 42, .9); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 -6px 18px rgba(0, 0, 0, .5); }
+.nom-more button { min-height: 48px; padding: 0 .2rem; border: 1px solid var(--line); border-radius: 10px; background: var(--bg); font-size: 1.6rem; line-height: 1; white-space: nowrap; }
+/* direct input: the 22 shapes in two rows of 11, in the order of the column (top, bottom, next column) */
+.directbar { display: none; flex: 1; min-width: 0; grid-template-rows: repeat(2, 44px); grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: .25rem; }
+.keybar.direct .directbar { display: grid; }
+.keybar.direct .variants, .keybar.direct .nom-more { display: none !important; }
+.directbar button { min-width: 0; padding: 0; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); font-family: var(--doc-font), system-ui, sans-serif; font-size: 1.5rem; line-height: 1; overflow: hidden; }
+.directbar button:active { background: rgba(255, 255, 255, .12); }
