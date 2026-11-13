@@ -7,11 +7,9 @@
 .title-input::placeholder { color: var(--bs-secondary-color); font-weight: 400; }
 .telex { flex: none; opacity: .45; }
 .telex[aria-pressed="true"] { opacity: 1; }
-.telex .han { font-size: 1.05rem; line-height: 1; }
 .status { flex: none; font-size: .8rem; color: var(--bs-secondary-color); white-space: nowrap; }
 @media (max-width: 575.98px) { .telex { flex: none; opacity: .45; }
 .telex[aria-pressed="true"] { opacity: 1; }
-.telex .han { font-size: 1.05rem; line-height: 1; }
 .status { display: none; } .scroll-bar #size { display: none; } }
 
 .page { max-width: 46rem; margin: 0 auto; padding: 2.5rem 1rem 40vh; }
@@ -74,7 +72,6 @@
 .scroll-ui .sep { width: 1px; align-self: stretch; margin: 3px 2px; background: var(--bs-border-color); }
 .scroll-ui .num { min-width: 1.6rem; text-align: center; font-variant-numeric: tabular-nums; }
 .scroll-ui .lbl { color: var(--bs-secondary-color); padding: 0 .3rem; white-space: nowrap; }
-.scroll-ui .han-btn { font-family: var(--font-cjk), serif; font-size: 1rem; }
 
 /* ruby: the base keeps its cell; the reading sits beside it (horizontal: over / under, vertical: right / left), narrowed by editor.js
    along the line when it is longer than the base (--rs) */
@@ -118,7 +115,6 @@
 .toolbar button:disabled { opacity: .3; }
 .toolbar .sep { flex: none; width: 1px; align-self: stretch; margin: 5px 4px; background: var(--bs-border-color); }
 .toolbar .num { flex: none; min-width: 1.6rem; text-align: center; font-variant-numeric: tabular-nums; }
-.toolbar .han-btn { font-family: var(--font-cjk), serif; font-size: 1rem; }
 .toolbar.bottom { position: fixed; left: 0; right: 0; max-width: none; margin: 0; z-index: 1060; background: var(--bs-body-bg);
     border-top: 1px solid var(--bs-border-color); box-shadow: 0 -.2rem .8rem rgba(0, 0, 0, .06); padding: .3rem .5rem; }
 body.toolbar-bottom .page { padding-bottom: 50vh; }

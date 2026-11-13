@@ -358,17 +358,16 @@ const UI = {
             b.addEventListener('click', () => { if (!this.view) return; run(); if (!RubyBox.isOpen()) this.view.focus(); });
             return b;
         };
-        const han = t => el('span', { className: 'han-btn', textContent: t });
         const icon = c => el('i', { className: 'bi ' + c });
         const sep = () => el('span', { className: 'sep' });
         const cmd = c => () => c(this.view.state, this.view.dispatch, this.view);
 
-        this.bH1 = btn('H1', 'Heading', 'Tiêu đề', cmd(setHeading(1)));
-        this.bH2 = btn('H2', 'Subheading', 'Tiêu đề phụ', cmd(setHeading(2)));
-        this.bWari = btn(han('雙'), 'Two-column text', 'Chữ hai dòng', cmd(toggleWari));
-        this.bRuby = btn(han('注'), 'Ruby (reading)', 'Chú âm', () => RubyBox.open());
-        this.bH = btn(han('橫'), 'Horizontal section', 'Phần ngang', () => this.setSection({ dir: 'h' }));
-        this.bV = btn(han('直'), 'Vertical section', 'Phần dọc', () => this.setSection({ dir: 'v' }));
+        this.bH1 = btn(icon('bi-type-h1'), 'Heading', 'Tiêu đề', cmd(setHeading(1)));
+        this.bH2 = btn(icon('bi-type-h2'), 'Subheading', 'Tiêu đề phụ', cmd(setHeading(2)));
+        this.bWari = btn(icon('bi-layout-split'), 'Two-column text', 'Chữ hai dòng', cmd(toggleWari));
+        this.bRuby = btn(icon('bi-superscript'), 'Ruby (reading)', 'Chú âm', () => RubyBox.open());
+        this.bH = btn(icon('bi-text-paragraph'), 'Horizontal section', 'Phần ngang', () => this.setSection({ dir: 'h' }));
+        this.bV = btn(icon('bi-layout-three-columns'), 'Vertical section', 'Phần dọc', () => this.setSection({ dir: 'v' }));
         this.bLess = btn(icon('bi-dash'), 'Fewer characters per column', 'Ít chữ hơn mỗi cột', () => this.setSection({ step: -1 }));
         this.colsNum = el('span', { className: 'num' });
         titled(this.colsNum, 'Characters per column', 'Số chữ mỗi cột');
@@ -382,13 +381,13 @@ const UI = {
         titled(this.plus, 'New section', 'Phần mới');
         this.plus.addEventListener('mousedown', e => e.preventDefault());
         this.plus.addEventListener('click', () => { this.menuOpen = !this.menuOpen; this.refresh(); });
-        const item = (h, en, viText, dir) => {
-            const b = btn(han(h), en, viText, () => { this.menuOpen = false; insertSection(this.view, dir); });
+        const item = (ic, en, viText, dir) => {
+            const b = btn(icon(ic), en, viText, () => { this.menuOpen = false; insertSection(this.view, dir); });
             b.append(vi(en, viText));
             return b;
         };
         this.plusMenu = el('div', { className: 'scroll-ui scroll-plus-menu', hidden: true },
-            item('橫', 'Horizontal section', 'Phần ngang', 'h'), item('直', 'Vertical section', 'Phần dọc', 'v'));
+            item('bi-text-paragraph', 'Horizontal section', 'Phần ngang', 'h'), item('bi-layout-three-columns', 'Vertical section', 'Phần dọc', 'v'));
         document.body.append(this.plus, this.plusMenu);
         document.addEventListener('pointerdown', e => {
             if (this.menuOpen && !this.plusMenu.contains(e.target) && !this.plus.contains(e.target)) { this.menuOpen = false; this.refresh(); }
@@ -504,9 +503,9 @@ const RubyBox = {
             b.dataset.k = k;
             return b;
         });
-        this.overBtn = btn(el('span', { className: 'han-btn' }), 'Over (vertical: right)', 'Trên (dọc: bên phải)', () => this.setSide('over'));
-        this.underBtn = btn(el('span', { className: 'han-btn' }), 'Under (vertical: left)', 'Dưới (dọc: bên trái)', () => this.setSide('under'));
-        this.eachBtn = btn(el('span', { className: 'han-btn', textContent: '字字' }), 'Each character its reading from the dictionary', 'Từng chữ theo từ điển', () => this.eachChar());
+        this.overBtn = btn(el('i', { className: 'bi' }), 'Over (vertical: right)', 'Trên (dọc: bên phải)', () => this.setSide('over'));
+        this.underBtn = btn(el('i', { className: 'bi' }), 'Under (vertical: left)', 'Dưới (dọc: bên trái)', () => this.setSide('under'));
+        this.eachBtn = btn(el('i', { className: 'bi bi-magic' }), 'Each character its reading from the dictionary', 'Từng chữ theo từ điển', () => this.eachChar());
         this.box = el('div', { className: 'scroll-ui ruby-box', hidden: true },
             el('div', { className: 'rt-row' }, this.input, this.ok, this.del),
             el('div', { className: 'rt-row' }, this.shown),
@@ -572,8 +571,8 @@ const RubyBox = {
     },
     markSide() {
         const vert = this.view.state.doc.resolve(this.range ? this.range.from : 0).node(1)?.attrs.dir === 'v';
-        this.overBtn.firstChild.textContent = vert ? '右' : '上';
-        this.underBtn.firstChild.textContent = vert ? '左' : '下';
+        this.overBtn.firstChild.className = 'bi ' + (vert ? 'bi-arrow-right' : 'bi-arrow-up');
+        this.underBtn.firstChild.className = 'bi ' + (vert ? 'bi-arrow-left' : 'bi-arrow-down');
         this.overBtn.classList.toggle('on', this.side === 'over');
         this.underBtn.classList.toggle('on', this.side === 'under');
     },
