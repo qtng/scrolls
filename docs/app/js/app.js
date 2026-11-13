@@ -477,16 +477,45 @@ window.notesApp = { store, ready, flush() } is for the tests.
     $('set-style').append(b);
   }
 
-  // the size: 100% is 32 pixels (about the 150% of the first versions, 22 px); the grid of the vertical pages follows it
-  const setSize = (value, user) => {
-    value = Math.min(300, Math.max(50, Number(value) || 100));
-    $('set-size').value = $('read-zoom').value = value; $('size-label').textContent = $('size-btn-label').textContent = value + '%';
-    document.documentElement.style.setProperty('--doc-size', Math.round(value * 0.32) + 'px');
-    if (user) keepFormat('size', value);
+  // The width of the pages is fixed with the document (format.width, in characters of the text: the width of the screen where it was made, at most
+  // 46rem, at 100% = 32 px), so that zooming never breaks the lines or columns differently. On a narrower screen the document is shown smaller until
+  // it fits: that is 100% there. The zoom (the slider) is a setting of this device for this document (localStorage), not part of the document.
+  const BASE = 32, ZOOM_KEY = 'nomNotesZoom';
+  const zooms = () => { try { return JSON.parse(localStorage.getItem(ZOOM_KEY)) || {}; } catch (e) { return {}; } };
+  const room = () => { const f = $('field'), cs = getComputedStyle(f); return Math.max(160, f.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight)); };
+  const pageWidth = () => Math.round(Math.min(room(), 736) / BASE * 10) / 10;   // in characters of 32 px
+  let zoom = 100;
+  function applySize() {
+    const doc = state.current, w = doc && doc.format && doc.format.width > 0 ? doc.format.width : pageWidth();
+    const fit = Math.min(1, room() / (w * BASE));
+    document.documentElement.style.setProperty('--page-em', String(w));
+    document.documentElement.style.setProperty('--doc-size', (BASE * fit * zoom / 100).toFixed(2) + 'px');
     NomEditor.relayout();
+  }
+  const setSize = (value, user) => {
+    zoom = Math.min(300, Math.max(50, Number(value) || 100));
+    $('set-size').value = $('read-zoom').value = zoom; $('size-label').textContent = $('size-btn-label').textContent = zoom + '%';
+    if (user && state.current) { const z = zooms(); if (zoom === 100) delete z[state.current.id]; else z[state.current.id] = zoom; try { localStorage.setItem(ZOOM_KEY, JSON.stringify(z)); } catch (e) { /* not kept */ } }
+    // the middle of what is seen stays where it is (a page wider than the screen scrolls sideways); a vertical page begins at its right edge
+    const f = $('field'), cx = user && f.scrollWidth > f.clientWidth ? (f.scrollLeft + f.clientWidth / 2) / f.scrollWidth : null;
+    const cy = user ? (f.scrollTop + f.clientHeight / 2) / Math.max(1, f.scrollHeight) : null;
+    applySize();
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      if (cx !== null) f.scrollLeft = cx * f.scrollWidth - f.clientWidth / 2;
+      else if (f.querySelector('.grp.v')) f.scrollLeft = f.scrollWidth;
+      if (cy !== null) f.scrollTop = cy * f.scrollHeight - f.clientHeight / 2;
+    }));
   };
   $('set-size').addEventListener('input', () => setSize($('set-size').value, true));
   $('read-zoom').addEventListener('input', () => setSize($('read-zoom').value, true));
+  window.addEventListener('resize', () => { if (state.current) applySize(); });
+  // a document without a width (a new one, or one of before): the width of this screen, kept in the document (not for a shared one)
+  function fixWidth(doc) {
+    if (doc.format && doc.format.width > 0) return;
+    const w = pageWidth();
+    doc.format = { ...(doc.format || {}), width: w };
+    if (!state.shared) schedule();
+  }
 
   // the rhyme table of the document: the QATT input, the QATT readings of the ruby
   for (const [name, label, vi] of VietnameseParser.TABLES) { const o = new Option(label, name); o.setAttribute('data-vi', vi); $('set-decoding').append(o); }
@@ -502,7 +531,8 @@ window.notesApp = { store, ready, flush() } is for the tests.
 
   function applyFormat(doc) {
     const f = formatOf(doc);
-    setFont(f.font); setSize(f.size); useDecoding(f.decoding);
+    fixWidth(doc);
+    setFont(f.font); setSize(zooms()[doc.id] || 100); useDecoding(f.decoding);
   }
 
   // ----- delete and undo -----
