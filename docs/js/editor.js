@@ -1,10 +1,11 @@
 /*
 The editor of a scroll (edit.html?id=<uuid>; edit.html?local: a test mode without login, kept in this browser only).
 
-A scroll is doc > section+ > group+ > (paragraph | heading)+. A section is a box (kind 'text'; later pictures or tables). The direction
-(horizontal: flowing text; vertical: columns of `cols` characters, right to left, continued in bands below) belongs to the paragraph; the
-paragraphs in a row with the same settings are a group, which keeps the settings. The groups are kept by the editor alone: a change of the
-settings splits them, neighbours with the same settings are joined (normalizePlugin); the user never sees them. Two-column text (warichu)
+A scroll is doc > section+ > group+ > (paragraph | heading)+. A section is a box (kind 'text'; later pictures or tables). A group is what the
+user sees as a page: paragraphs in a row with the same direction (horizontal: flowing text; vertical: columns of `cols` characters, right to
+left, continued in bands below), with a dotted line between pages. Without a selection the drop-downs set the page with the caret; with a
+selection the paragraphs it touches (their page is split around them). Neighbouring pages with the same settings are joined (normalizePlugin)
+unless the second one starts with a page break (brk, Ctrl+Enter). Two-column text (warichu)
 is a mark; editor.js lays it out as segments (inline decorations), the bands of vertical groups get their height here. ProseMirror comes from js/prosemirror.js
 (window.PM, built in the private repository), the Telex input from /chunom/js/ime.js (no candidate list).
 */
@@ -35,12 +36,13 @@ const schema = new Schema({
             parseDOM: [{ tag: 'section.sec' }],
             toDOM: n => ['section', { class: 'sec shadow p-3', 'data-kind': n.attrs.kind }, 0],
         },
-        // paragraphs in a row with the same direction and characters per column (kept by the editor, see above)
+        // a page: paragraphs in a row with the same direction and characters per column (kept by the editor, see above)
         group: {
             content: 'block+',
-            attrs: { dir: { default: 'v' }, cols: { default: DEFAULT_COLS } },
-            parseDOM: [{ tag: 'div.grp', getAttrs: d => ({ dir: d.dataset.dir === 'h' ? 'h' : 'v', cols: clampCols(+d.dataset.cols) }) }],
-            toDOM: n => ['div', { class: 'grp ' + n.attrs.dir, 'data-dir': n.attrs.dir, 'data-cols': n.attrs.cols, style: `--cols: ${n.attrs.cols}` }, 0],
+            // brk: the page starts with a page break (it is not joined with the page before when the settings are the same)
+            attrs: { dir: { default: 'v' }, cols: { default: DEFAULT_COLS }, brk: { default: false } },
+            parseDOM: [{ tag: 'div.grp', getAttrs: d => ({ dir: d.dataset.dir === 'h' ? 'h' : 'v', cols: clampCols(+d.dataset.cols), brk: d.dataset.brk === '1' }) }],
+            toDOM: n => ['div', { class: 'grp ' + n.attrs.dir, 'data-dir': n.attrs.dir, 'data-cols': n.attrs.cols, 'data-brk': n.attrs.brk ? '1' : '0', style: `--cols: ${n.attrs.cols}` }, 0],
         },
         paragraph: { group: 'block', content: 'inline*', parseDOM: [{ tag: 'p' }], toDOM: () => ['p', 0] },
         heading: {
@@ -70,15 +72,15 @@ const sameSettings = (a, b) => a.dir === b.dir && (a.dir === 'h' || a.cols === b
 // the group of a position (null outside the text)
 const groupOf = $pos => { for (let d = $pos.depth; d > 0; d--) if ($pos.node(d).type === S.group) return { node: $pos.node(d), pos: $pos.before(d), depth: d }; return null; };
 
-// a stored scroll of the first version (doc > section{dir, cols} > blocks) becomes one section with a group for each of its sections
+// a stored scroll of the first version (doc > section{dir, cols} > blocks) becomes one section with a page for each of its sections
 function upgrade(json) {
     const secs = (json && json.content) || [];
     if (!secs.length || !secs[0].content || !secs[0].content.length || secs[0].content[0].type === 'group') return json;
     const groups = [];
     for (const sec of secs) {
-        const a = sec.attrs || {}, attrs = { dir: a.dir === 'h' ? 'h' : 'v', cols: clampCols(+a.cols) }, last = groups[groups.length - 1];
-        if (last && sameSettings(last.attrs, attrs)) last.content.push(...(sec.content || []));
-        else groups.push({ type: 'group', attrs, content: [...(sec.content || [])] });
+        // every old section becomes a page of its own (a page break where the settings are the same)
+        const a = sec.attrs || {}, attrs = { dir: a.dir === 'h' ? 'h' : 'v', cols: clampCols(+a.cols), brk: groups.length > 0 };
+        groups.push({ type: 'group', attrs, content: [...(sec.content || [])] });
     }
     return { type: 'doc', content: [{ type: 'section', attrs: { kind: 'text' }, content: groups }] };
 }
@@ -104,11 +106,12 @@ class GroupView {
 }
 
 // ---------------------------------------------------------------- commands
-// The settings (dir, cols) of the paragraphs that the selection touches (or of the one with the caret), as in a word processor:
-// their group is split around them and gets the settings; normalizePlugin joins it with neighbours that have the same ones.
-function setSettings(change) {
+// The settings (dir, cols) of a page or of paragraphs. Without a selection: the page with the caret (it may join a neighbour with the same
+// settings). With a selection (or paragraphs: true): the paragraphs it touches, as in a word processor; their page is split around them.
+function setSettings(change, { paragraphs = null } = {}) {
     return (state, dispatch) => {
-        const { from, to } = state.selection, touched = [];
+        const { from, to, empty } = state.selection, touched = [];
+        const whole = paragraphs === null ? empty : !paragraphs;
         state.doc.nodesBetween(from, to, (node, pos, parent, index) => {
             if (node.type === S.group) { touched.push({ pos, node, first: -1, last: -1 }); return true; }
             if (node.isTextblock) { const g = touched[touched.length - 1]; if (g && parent === g.node) { if (g.first < 0) g.first = index; g.last = index; } return false; }
@@ -119,20 +122,37 @@ function setSettings(change) {
             const g = touched[k], a = g.node.attrs;
             if (g.first < 0) continue;
             const attrs = { ...a, ...change };
-            if (attrs.dir === a.dir && attrs.cols === a.cols) continue;
+            if (attrs.dir === a.dir && attrs.cols === a.cols && attrs.brk === a.brk) continue;
+            if (whole) { tr.setNodeMarkup(g.pos, null, attrs); continue; }
             let start = g.pos + 1;
             for (let i = 0; i < g.first; i++) start += g.node.child(i).nodeSize;
             let end = start;
             for (let i = g.first; i <= g.last; i++) end += g.node.child(i).nodeSize;
-            if (g.last < g.node.childCount - 1) tr.split(end, 1);
-            let at = g.pos;
-            if (g.first > 0) { tr.split(start, 1); at = start + 1; }
-            tr.setNodeMarkup(at, null, attrs);
+            // the parts split off continue the page: no page break
+            if (g.last < g.node.childCount - 1) tr.split(end, 1, [{ type: S.group, attrs: { ...a, brk: false } }]);
+            let at = g.pos, own = attrs;
+            if (g.first > 0) { tr.split(start, 1, [{ type: S.group, attrs: { ...a, brk: false } }]); at = start + 1; own = { ...attrs, brk: change.brk ?? false }; }
+            tr.setNodeMarkup(at, null, own);
         }
         if (!tr.docChanged) return false;
         if (dispatch) dispatch(tr.scrollIntoView());
         return true;
     };
+}
+
+// Ctrl+Enter: a new page from the caret on (the paragraph is split there; at its start the page begins before it), same settings
+function pageBreak(state, dispatch) {
+    if (!groupOf(state.selection.$from)) return false;
+    if (!dispatch) return true;
+    const tr = state.tr;
+    if (!state.selection.empty) tr.deleteSelection();
+    if (tr.selection.$from.parentOffset > 0) tr.split(tr.selection.from);
+    const $p = tr.selection.$from, g = groupOf($p);
+    if ($p.index(g.depth) > 0) tr.split($p.before($p.depth), 1, [{ type: S.group, attrs: { ...g.node.attrs, brk: true } }]);
+    else if ($p.index(g.depth - 1) > 0 && !g.node.attrs.brk) tr.setNodeMarkup(g.pos, null, { ...g.node.attrs, brk: true });
+    else return false;
+    dispatch(tr.scrollIntoView());
+    return true;
 }
 
 // Backspace at the start of the first paragraph of a group: the paragraph first takes the settings of the one before (it joins it),
@@ -144,7 +164,9 @@ function joinGroupBackward(state, dispatch, view) {
     if (!g || $cursor.index(g.depth) !== 0 || $cursor.index(g.depth - 1) === 0) return false;
     const prev = $cursor.node(g.depth - 1).child($cursor.index(g.depth - 1) - 1);
     if (!dispatch) return true;
-    setSettings(prev.attrs)(state, dispatch);
+    // a page break between pages with the same settings: Backspace takes the break away (the paragraphs stay)
+    if (g.node.attrs.brk && sameSettings(prev.attrs, g.node.attrs)) { dispatch(state.tr.setNodeMarkup(g.pos, null, { ...g.node.attrs, brk: false })); return true; }
+    setSettings({ dir: prev.attrs.dir, cols: prev.attrs.cols, brk: false }, { paragraphs: true })(state, dispatch);
     if (view) joinBackward(view.state, view.dispatch);
     return true;
 }
@@ -156,10 +178,12 @@ function joinGroupForward(state, dispatch, view) {
     const box = $cursor.node(g.depth - 1), gi = $cursor.index(g.depth - 1);
     if ($cursor.index(g.depth) !== g.node.childCount - 1 || gi === box.childCount - 1) return false;
     if (!dispatch) return true;
-    const nextStart = g.pos + g.node.nodeSize + 2;   // in the first paragraph of the next group
+    const next = box.child(gi + 1), nextPos = g.pos + g.node.nodeSize;
+    if (next.attrs.brk && sameSettings(next.attrs, g.node.attrs)) { dispatch(state.tr.setNodeMarkup(nextPos, null, { ...next.attrs, brk: false })); return true; }
+    const nextStart = nextPos + 2;   // in the first paragraph of the next group
     const tr = state.tr.setSelection(TextSelection.create(state.doc, nextStart));
     const moved = state.apply(tr);
-    setSettings(g.node.attrs)(moved, t => {
+    setSettings({ dir: g.node.attrs.dir, cols: g.node.attrs.cols, brk: false }, { paragraphs: true })(moved, t => {
         // the settings on the next paragraph, the caret back where it was
         for (const step of t.steps) tr.step(step);
         tr.setSelection(TextSelection.create(tr.doc, $cursor.pos));
@@ -169,7 +193,7 @@ function joinGroupForward(state, dispatch, view) {
     return true;
 }
 
-// groups next to each other with the same settings become one (after every change)
+// pages next to each other with the same settings become one (after every change), unless the second one starts with a page break
 const normalizePlugin = new Plugin({
     appendTransaction(trs, old, state) {
         if (!trs.some(t => t.docChanged)) return null;
@@ -178,7 +202,7 @@ const normalizePlugin = new Plugin({
             if (sec.type !== S.section) return;
             let pos = secPos + 1, prev = null;
             sec.forEach(child => {
-                if (prev && prev.type === S.group && child.type === S.group && sameSettings(prev.attrs, child.attrs)) joins.push(pos);
+                if (prev && prev.type === S.group && child.type === S.group && !child.attrs.brk && sameSettings(prev.attrs, child.attrs)) joins.push(pos);
                 prev = child;
                 pos += child.nodeSize;
             });
@@ -524,9 +548,10 @@ const UI = {
             sel.addEventListener('change', () => { if (this.view) { change(sel.value); this.view.focus(); } });
             return sel;
         };
-        this.selDir = select('Text direction', 'Hướng chữ', [['h', 'Horizontal', 'Ngang'], ['v', 'Vertical', 'Dọc']], v => this.setSettings({ dir: v }));
+        this.selDir = select('Page direction', 'Hướng trang', [['h', 'Horizontal', 'Ngang'], ['v', 'Vertical', 'Dọc']], v => this.setSettings({ dir: v }));
         this.selCols = select('Characters per column', 'Số chữ mỗi cột', COLS_OPTIONS.map(n => [String(n), String(n)]), v => this.setSettings({ cols: clampCols(+v) }));
-        this.bar.append(this.bH1, this.bH2, this.bWari, this.bRuby, sep(), this.selDir, this.selCols);
+        this.bPage = btn(icon('fa-file-circle-plus'), 'New page (Ctrl+Enter)', 'Trang mới (Ctrl+Enter)', cmd(pageBreak));
+        this.bar.append(this.bH1, this.bH2, this.bWari, this.bRuby, sep(), this.selDir, this.selCols, this.bPage);
 
         const pos = () => this.position();
         if (window.visualViewport) for (const ev of ['resize', 'scroll']) visualViewport.addEventListener(ev, pos);
@@ -581,7 +606,7 @@ const UI = {
         this.position();
 
     },
-    setSettings(change) { setSettings(change)(this.view.state, this.view.dispatch); },
+    setSettings(change) { setSettings(change)(this.view.state, this.view.dispatch); },   // the page, or the paragraphs of the selection
 };
 
 // the box to write a ruby: a field (Quốc Ngữ, with Telex), the readings of the dictionary, the script (QN, PA, QATT), the side, each character
@@ -879,7 +904,7 @@ async function start() {
                 'Mod-Shift-d': toggleWari,
                 'Mod-Shift-r': openRuby,
                 'Mod-Shift-Space': () => { document.getElementById('telex').click(); return true; },
-                'Backspace': joinGroupBackward, 'Delete': joinGroupForward,
+                'Backspace': joinGroupBackward, 'Delete': joinGroupForward, 'Mod-Enter': pageBreak,
             }),
             keymap(baseKeymap),
             history(),
