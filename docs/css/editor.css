@@ -131,3 +131,20 @@ body.toolbar-bottom .page { padding-bottom: 50vh; }
 .toolbar .form-select { flex: none; padding-left: .4rem; padding-right: 1.5rem; background-position: right .4rem center; width: auto; height: 2.1rem; padding-top: 0; padding-bottom: 0; font-size: .85rem; border-color: transparent; background-color: transparent; }
 .toolbar .form-select:disabled { opacity: .3; }
 .toolbar button.txt { font-weight: 600; letter-spacing: .02em; }
+
+/* the bar of the Chữ Nôm candidates: under the toolbar; on the phone above it (editor.js sets its top) */
+.cands { position: relative; display: flex; align-items: center; gap: 4px; max-width: 52rem; margin: 0 auto; padding: 0 1rem .35rem; }
+.cands[hidden] { display: none; }
+.cand-slots { flex: 1 1 auto; min-width: 0; display: flex; gap: 4px; overflow: hidden; }
+.cands .cand { flex: 0 0 auto; min-width: 42px; height: 42px; padding: 0 .3rem; white-space: nowrap; border: 1px solid var(--bs-border-color); border-radius: .5rem; background: var(--bs-body-bg); color: inherit;
+    font-family: var(--doc-font, var(--font-cjk)), var(--font-cjk), serif; font-size: 1.5rem; line-height: 1; }
+.cands .cand:disabled { opacity: .3; }
+.cands .cand:not(:disabled):hover { background: color-mix(in srgb, currentColor 8%, var(--bs-body-bg)); }
+.cand-more { flex: none; width: 32px; height: 42px; border: 1px solid var(--bs-border-color); border-radius: .5rem; background: transparent; color: inherit; }
+.cand-more:disabled { opacity: .3; }
+.cand-panel { position: absolute; z-index: 1070; left: 1rem; right: 1rem; top: 100%; max-height: 40vh; overflow-y: auto; display: flex; flex-wrap: wrap; align-content: flex-start;
+    gap: 4px; padding: 6px; border: 1px solid var(--bs-border-color); border-radius: .6rem; box-shadow: 0 .3rem 1rem rgba(0, 0, 0, .15); }
+.cand-panel[hidden] { display: none; }
+.cand-panel.up { top: auto; bottom: 100%; }
+.cands.bottom { position: fixed; left: 0; right: 0; max-width: none; margin: 0; z-index: 1060; padding: .3rem .5rem; border-top: 1px solid var(--bs-border-color); }
+.cands.bottom .cand-panel { left: .5rem; right: .5rem; }

@@ -7,7 +7,7 @@ left, continued in bands below), with a dotted line between pages. Without a sel
 selection the paragraphs it touches (their page is split around them). Neighbouring pages with the same settings are joined (normalizePlugin)
 unless the second one starts with a page break (brk, Ctrl+Enter). Two-column text (warichu)
 is a mark; editor.js lays it out as segments (inline decorations), the bands of vertical groups get their height here. ProseMirror comes from js/prosemirror.js
-(window.PM, built in the private repository), the Telex input from /chunom/js/ime.js (no candidate list).
+(window.PM, built in the private repository), the Telex input and the dictionaries of the candidate bar from /chunom/js/ime.js.
 */
 (() => {
 'use strict';
@@ -564,14 +564,17 @@ const UI = {
         const bar = this.bar;
         if (!bar || bar.hidden) return;
         const low = this.bottom.matches;
+        const cands = document.getElementById('cands');
         bar.classList.toggle('bottom', low);
+        cands.classList.toggle('bottom', low);
         document.body.classList.toggle('toolbar-bottom', low);
-        if (!low) { bar.style.top = ''; return; }
+        if (!low) { bar.style.top = ''; cands.style.top = ''; return; }
         const vv = window.visualViewport, vh = vv ? vv.height : innerHeight, oy = vv ? vv.offsetTop : 0;
         const site = document.querySelector('.bottom-bar');
         let limit = oy + vh;
         if (site && getComputedStyle(site).display !== 'none') limit = Math.min(limit, site.getBoundingClientRect().top);
         bar.style.top = Math.max(0, limit - bar.offsetHeight) + 'px';
+        cands.style.top = Math.max(0, limit - bar.offsetHeight - cands.offsetHeight) + 'px';   // the candidates above the toolbar
         if (RubyBox.isOpen()) RubyBox.place();
     },
     refresh() {
@@ -601,12 +604,97 @@ const UI = {
         }
         this.selDir.value = dir || '';
         this.selCols.value = c !== null ? String(c) : '';
+        Cands.refresh();
         this.selDir.disabled = !dirs.size;
         this.selCols.disabled = !cols.size;
         this.position();
 
     },
     setSettings(change) { setSettings(change)(this.view.state, this.view.dispatch); },   // the page, or the paragraphs of the selection
+};
+
+// The Chữ Nôm candidates of the Quốc Ngữ word before the caret, in a bar of their own (as in Qatt.org Notes): on the desktop under the
+// toolbar, on the phone above it. As many slots as the width holds; the arrow opens the others. A click puts the character in place of the word.
+const NOT_LETTER = /[^\p{Script=Latin}\p{M}]/u, WORD_END = /[\p{Script=Latin}\p{M}]+$/u;   // Han characters are no Quốc Ngữ
+const Cands = {
+    view: null, list: [], shown: 0, key: '', ready: false,
+    init(view) {
+        this.view = view;
+        this.bar = document.getElementById('cands');
+        this.slots = el('div', { className: 'cand-slots' });
+        this.more = el('button', { type: 'button', className: 'cand-more', disabled: true });
+        this.more.append(el('i', { className: 'fa-solid fa-caret-down' }));
+        titled(this.more, 'More Chữ Nôm candidates', 'Thêm gợi ý chữ Nôm');
+        this.more.setAttribute('aria-expanded', 'false');
+        this.panel = el('div', { className: 'cand-panel bg-light', hidden: true });
+        this.bar.append(this.slots, this.more, this.panel);
+        const keep = e => e.preventDefault();   // a click in the bar leaves the caret (and the keyboard) in the text
+        this.bar.addEventListener('mousedown', keep);
+        this.bar.addEventListener('pointerdown', e => { if (e.pointerType === 'mouse') e.preventDefault(); });
+        this.more.addEventListener('click', () => this.open(this.panel.hidden));
+        document.addEventListener('pointerdown', e => { if (!this.panel.hidden && !this.bar.contains(e.target)) this.open(false); });
+        if (window.VietIme) VietIme.load().then(() => { this.ready = true; this.key = ''; this.refresh(); }).catch(e => console.error('The dictionaries could not be loaded:', e));
+        window.addEventListener('resize', () => { this.key = ''; this.refresh(); });
+        this.bar.hidden = false;
+    },
+    // the word before the caret (not in the middle of a word) and its candidates
+    find() {
+        const { state, composing } = this.view, sel = state.selection;
+        if (!this.ready || !sel.empty || !this.on()) return null;
+        const $c = sel.$from, before = $c.parent.textBetween(0, $c.parentOffset, null, '\ufffc'), after = $c.parent.textBetween($c.parentOffset, $c.parent.content.size, null, '\ufffc');
+        if (after && !NOT_LETTER.test(after[0])) return null;
+        const m = WORD_END.exec(before);
+        if (!m) return null;
+        const word = composing ? VietIme.telex(m[0]) : m[0], list = VietIme.lookup(word);
+        return list.length ? { from: $c.pos - m[0].length, to: $c.pos, word, list } : null;
+    },
+    on() { return document.getElementById('telex')?.getAttribute('aria-pressed') !== 'false'; },
+    refresh() {
+        if (!this.bar || !this.view) return;
+        const f = this.find();
+        this.found = f;
+        this.list = f ? f.list : [];
+        const n = Math.max(3, Math.floor((this.bar.clientWidth - 48) / 46));
+        const key = (f ? f.from + ':' + f.word : '') + '|' + n;
+        if (key === this.key) return;
+        this.key = key;
+        const shown = this.list.slice(0, n);
+        this.shown = shown.length;
+        const slot = (c, i) => {
+            const b = el('button', { type: 'button', className: 'cand', textContent: c ? c.glyph : '·', disabled: !c });
+            if (c) { b.title = c.reading + (c.definition ? ' – ' + c.definition : ''); b.addEventListener('click', () => this.take(i)); }
+            return b;
+        };
+        this.slots.replaceChildren(...Array.from({ length: n }, (_, i) => slot(shown[i], i)));
+        // a candidate of several characters is wider: what does not fit goes to the panel
+        const right = this.slots.getBoundingClientRect().right;
+        while (this.slots.lastChild && this.slots.lastChild.getBoundingClientRect().right > right + 0.5) { this.slots.lastChild.remove(); this.shown = Math.min(this.shown, this.slots.childElementCount); }
+        this.more.disabled = this.list.length <= this.shown;
+        this.open(false);
+    },
+    open(on) {
+        this.panel.hidden = !on;
+        this.more.setAttribute('aria-expanded', String(on));
+        this.more.firstChild.className = 'fa-solid ' + ((on !== UI.bottom.matches) ? 'fa-caret-up' : 'fa-caret-down');
+        if (!on) return;
+        this.panel.classList.toggle('up', UI.bottom.matches);
+        this.panel.replaceChildren(...this.list.slice(this.shown).map((c, j) => {
+            const b = el('button', { type: 'button', className: 'cand', textContent: c.glyph });
+            b.title = c.reading + (c.definition ? ' – ' + c.definition : '');
+            b.addEventListener('click', () => this.take(this.shown + j));
+            return b;
+        }));
+        this.panel.scrollTop = 0;
+    },
+    // the character takes the place of the word (with the marks of the text there)
+    take(i) {
+        const f = this.found, c = this.list[i];
+        if (!f || !c) return;
+        const view = this.view, tr = view.state.tr.insertText(c.glyph, f.from, f.to);
+        view.dispatch(tr.scrollIntoView());
+        this.open(false);
+        view.focus();
+    },
 };
 
 // the box to write a ruby: a field (Quốc Ngữ, with Telex), the readings of the dictionary, the script (QN, PA, QATT), the side, each character
@@ -925,11 +1013,12 @@ async function start() {
     });
     UI.view = editor;
     RubyBox.init(editor);
+    Cands.init(editor);
     UI.show();
     UI.refresh();
     window.scrollsEditor = editor;   // for tests
 
-    // Telex (no Chữ Nôm candidates in the editor): on unless switched off (kept in this browser)
+    // Telex (the Chữ Nôm candidates are in a bar of their own, Cands): on unless switched off (kept in this browser)
     const telexBtn = $('telex');
     let telexOn = true;
     try { telexOn = localStorage.getItem('scrollsTelex') !== '0'; } catch (e) { /* default */ }
@@ -944,7 +1033,7 @@ async function start() {
         try { localStorage.setItem('scrollsTelex', on ? '1' : '0'); } catch (e) { /* only for this page */ }
     };
     setTelex(telexOn);
-    telexBtn.addEventListener('click', () => { setTelex(!telexOn); editor.focus(); });
+    telexBtn.addEventListener('click', () => { setTelex(!telexOn); Cands.key = ''; Cands.refresh(); editor.focus(); });
 
     titleInput.addEventListener('input', () => { document.title = titleInput.value.trim() || 'Scroll'; store.changed(); });
     titleInput.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); editor.focus(); } });
