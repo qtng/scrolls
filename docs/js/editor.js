@@ -391,7 +391,13 @@ const UI = {
         this.bDel = btn(el('i', { className: 'bi bi-trash' }), 'Delete section', 'Xóa phần', () => this.deleteSection());
         this.tools = el('div', { className: 'scroll-ui', hidden: true }, this.bH, this.bV, this.colsBox, el('span', { className: 'sep' }), this.bDel);
 
-        document.body.append(this.bubble, this.plus, this.plusMenu, this.tools);
+        // the tools of a section only on request: a small button at its corner opens them
+        this.secBtn = el('button', { type: 'button', className: 'scroll-plus scroll-sec', hidden: true });
+        this.secBtn.append(el('i', { className: 'bi bi-sliders2' }));
+        titled(this.secBtn, 'Section settings', 'Cài đặt phần');
+        this.secBtn.addEventListener('mousedown', e => e.preventDefault());
+        this.secBtn.addEventListener('click', () => { this.toolsOpen = !this.toolsOpen; this.refresh(); });
+        document.body.append(this.bubble, this.plus, this.plusMenu, this.secBtn, this.tools);
         if (window.visualViewport) for (const ev of ['resize', 'scroll']) visualViewport.addEventListener(ev, () => this.refresh());
         document.addEventListener('pointerdown', e => {
             if (this.menuOpen && !this.plusMenu.contains(e.target) && !this.plus.contains(e.target)) { this.menuOpen = false; this.refresh(); }
@@ -414,7 +420,7 @@ const UI = {
         box.style.top = Math.max(oy + 8, Math.min(oy + vh, barTop) - h - 24) + 'px';
     },
     place(box, left, top) {
-        if (this.coarse && box !== this.plus && box !== this.plusMenu) return this.dock(box);
+        if (this.coarse && box !== this.plus && box !== this.plusMenu && box !== this.secBtn) return this.dock(box);
         const w = box.offsetWidth, vw = document.documentElement.clientWidth;
         box.style.left = Math.max(8, Math.min(left, vw - w - 8)) + scrollX + 'px';
         box.style.top = Math.max(8, top) + scrollY + 'px';
@@ -456,8 +462,19 @@ const UI = {
             this.place(this.plusMenu, r.left, r.bottom + 6);
         }
 
-        // section tools
-        if (show(this.tools, focused && sel.empty && !inRuby && sel.$from.depth >= 1)) {
+        // the button of the section settings (at the corner of the section) and, if it was pressed, the tools
+        const secOk = focused && sel.empty && !inRuby && sel.$from.depth >= 1 && !emptyLine;
+        const secPos = secOk ? sectionAt(sel.$from).pos : -1;
+        if (secPos !== this.toolsFor) { this.toolsOpen = false; this.toolsFor = secPos; }   // another section: closed again
+        if (show(this.secBtn, secOk)) {
+            const dom = view.nodeDOM(secPos);
+            if (dom) {
+                const r = dom.getBoundingClientRect(), size = this.secBtn.offsetWidth || 32;
+                this.place(this.secBtn, Math.max(8, r.left - size - 8), Math.max(r.top, 8));
+            }
+            this.secBtn.classList.toggle('open', !!this.toolsOpen);
+        }
+        if (show(this.tools, secOk && !!this.toolsOpen)) {
             const sec = sectionAt(sel.$from), dom = view.nodeDOM(sec.pos);
             const a = sec.node.attrs;
             this.bH.classList.toggle('on', a.dir === 'h');
@@ -469,14 +486,9 @@ const UI = {
             this.bMore.disabled = a.cols >= MAX_COLS;
             this.bDel.disabled = state.doc.childCount < 2;
             if (dom) {
-                // above the section on the left: the plus of a vertical section sits above its column, mostly further right
-                const r = dom.getBoundingClientRect();
-                let top = r.top - this.tools.offsetHeight - 8;
-                if (!this.plus.hidden) {
-                    const pr = this.plus.getBoundingClientRect();
-                    if (pr.left < r.left + this.tools.offsetWidth + 8 && pr.bottom > top) top = Math.min(top, pr.top - this.tools.offsetHeight - 6);
-                }
-                this.place(this.tools, r.left, top);
+                // under the button of the settings
+                const br = this.secBtn.getBoundingClientRect();
+                this.place(this.tools, br.left, br.bottom + 6);
             }
         }
     },

@@ -115,3 +115,7 @@
 
 /* on a touch screen the menus are docked above the keyboard (editor.js) */
 .scroll-ui.docked { position: fixed; z-index: 1060; }
+
+/* the button of the section settings: small and quiet, at the corner of the section */
+.scroll-sec { width: 1.7rem; height: 1.7rem; font-size: .8rem; opacity: .7; }
+.scroll-sec.open { transform: none; opacity: 1; background: color-mix(in srgb, currentColor 12%, var(--bs-body-bg)); }
