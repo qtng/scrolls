@@ -95,9 +95,14 @@ window.notesApp = { store, ready, flush() } is for the tests.
   window.addEventListener('pagehide', () => { save(); });
 
   // ----- editor -----
-  NomEditor.mount($('editor'), $('toolbar'), [NomInput.plugin]);
+  NomEditor.mount($('editor'), { format: $('toolbar'), dir: $('page-tools'), menu: $('page-menu'), newPage: $('page-new') }, [NomInput.plugin]);
+  $('menu').addEventListener('click', e => { if (e.target.closest('.menu-close')) closeMenu(); });
   const edited = () => { schedule(); showTitle(); buttons(); };
-  const showTitle = () => { $('editor-title').textContent = DocsCore.title(NomEditor.text(), state.current && state.current.title); };
+  const showTitle = () => {   // above the pages; without a title a muted "Untitled"
+    const t = DocsCore.title(NomEditor.text(), state.current && state.current.title), e = $('editor-title');
+    e.textContent = t || Lang.t('Untitled', 'Không có tiêu đề');
+    e.classList.toggle('untitled', !t);
+  };
   function buttons() { $('undo-btn').disabled = !NomEditor.editable || !NomEditor.canUndo(); $('redo-btn').disabled = !NomEditor.editable || !NomEditor.canRedo(); }
   for (const [id, step] of [['undo-btn', 'undo'], ['redo-btn', 'redo']]) {
     $(id).addEventListener('pointerdown', e => e.preventDefault());   // the keyboard stays

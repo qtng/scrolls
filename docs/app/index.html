@@ -59,13 +59,17 @@
   <section id="view-editor" class="view" hidden>
     <header class="appbar">
       <button id="back" class="icon-btn" type="button" aria-label="Back" data-vi-aria-label="Quay lại"><i class="fa-solid fa-arrow-left"></i></button>
-      <div id="editor-title" class="title" role="button" tabindex="0" aria-label="Title" data-vi-aria-label="Tiêu đề"></div>
-      <input id="title-input" class="title" type="text" hidden autocomplete="off" spellcheck="false" aria-label="Title" data-vi-aria-label="Tiêu đề">
+      <button id="undo-btn" class="bar-btn" type="button" disabled aria-label="Undo" data-vi-aria-label="Hoàn tác" title="Undo" data-vi-title="Hoàn tác"><span class="uni" aria-hidden="true">↶</span></button>
+      <button id="redo-btn" class="bar-btn" type="button" disabled aria-label="Redo" data-vi-aria-label="Làm lại" title="Redo" data-vi-title="Làm lại"><span class="uni" aria-hidden="true">↷</span></button>
+      <span id="page-new" class="page-tools"></span>
+      <span class="grow"></span>
       <button id="edit-btn" class="icon-btn" type="button" aria-label="Edit" data-vi-aria-label="Chỉnh sửa"><i class="fa-solid fa-pencil"></i></button>
       <button id="style-btn" class="style-btn" type="button" aria-label="Style" data-vi-aria-label="Kiểu" aria-haspopup="true" aria-expanded="false"></button>
       <div id="style-menu" class="menu" hidden><div id="set-style" role="radiogroup"></div></div>
       <button id="menu-btn" class="icon-btn" type="button" aria-label="Menu" data-vi-aria-label="Menu" aria-haspopup="true" aria-expanded="false"><i class="fa-solid fa-ellipsis-vertical"></i></button>
       <div id="menu" class="menu" hidden>
+        <div id="page-menu"></div>
+        <div class="menu-sep" role="separator"></div>
         <label class="menu-row"><span data-vi="Bảng vần">Rhyme table</span><select id="set-decoding" autocomplete="off"></select></label>
         <div class="menu-sep" role="separator"></div>
         <button id="menu-delete" type="button"><i class="fa-solid fa-trash"></i> <span data-vi="Xóa">Delete</span></button>
@@ -73,24 +77,29 @@
       </div>
     </header>
     <div id="fmtbar" class="fmtbar" role="toolbar" aria-label="Format" data-vi-aria-label="Định dạng">
-      <button id="undo-btn" type="button" disabled aria-label="Undo" data-vi-aria-label="Hoàn tác" title="Undo" data-vi-title="Hoàn tác"><span class="uni" aria-hidden="true">↶</span></button>
-      <button id="redo-btn" type="button" disabled aria-label="Redo" data-vi-aria-label="Làm lại" title="Redo" data-vi-title="Làm lại"><span class="uni" aria-hidden="true">↷</span></button>
-      <select id="set-ime" class="ime-select" autocomplete="off" aria-label="Input" data-vi-aria-label="Cách nhập" title="Input" data-vi-title="Cách nhập">
-        <option value="qn" data-vi="Quốc Ngữ">Quốc Ngữ</option>
-        <option value="qatt" data-vi="QATT Telex">QATT Telex</option>
-        <option value="pa" data-vi="PA Telex">PA Telex</option>
-        <option value="direct" data-vi="QATT nhập trực tiếp">QATT direct input</option>
-        <option value="off" data-vi="Không Telex">No Telex</option>
-      </select>
       <span id="toolbar" class="tools"></span>
+      <span id="page-tools" class="page-tools"></span>
       <span class="pop end">
-        <button id="size-btn" type="button" aria-label="Size" data-vi-aria-label="Cỡ chữ" title="Size" data-vi-title="Cỡ chữ" aria-haspopup="true" aria-expanded="false"><span id="size-btn-label">100%</span><i class="fa-solid fa-caret-down caret"></i></button>
+        <button id="size-btn" class="size-btn" type="button" aria-label="Size" data-vi-aria-label="Cỡ chữ" title="Size" data-vi-title="Cỡ chữ" aria-haspopup="true" aria-expanded="false"><span id="size-btn-label">100%</span><i class="fa-solid fa-caret-down caret"></i></button>
         <div id="size-menu" class="menu" hidden>
           <label class="menu-row"><span data-vi="Cỡ chữ">Size</span><input id="set-size" type="range" min="50" max="300" step="10" value="100" autocomplete="off"><output id="size-label">100%</output></label>
         </div>
       </span>
+      <select id="set-ime" class="ime-select" autocomplete="off" aria-label="Input" data-vi-aria-label="Cách nhập" title="Input" data-vi-title="Cách nhập">
+        <option value="qn" data-vi="Quốc Ngữ">Quốc Ngữ</option>
+        <option value="qatt" data-vi="QATT Telex">QATT Telex</option>
+        <option value="pa" data-vi="PA Telex">PA Telex</option>
+        <option value="direct" data-vi="QATT trực tiếp">QATT direct</option>
+        <option value="off" data-vi="Không Telex">No Telex</option>
+      </select>
     </div>
-    <div id="field" class="field"><div id="editor"></div></div>
+    <div id="field" class="field">
+      <div class="doc-head">
+        <div id="editor-title" class="doc-title" role="button" tabindex="0" aria-label="Title" data-vi-aria-label="Tiêu đề"></div>
+        <input id="title-input" class="doc-title" type="text" hidden autocomplete="off" spellcheck="false" aria-label="Title" data-vi-aria-label="Tiêu đề" placeholder="Title" data-vi-placeholder="Tiêu đề">
+      </div>
+      <div id="editor"></div>
+    </div>
     <div id="keybar" class="keybar" hidden>
       <span class="variants" role="group" aria-label="Chữ Nôm candidates and variants of the characters before the cursor" data-vi-aria-label="Gợi ý Chữ Nôm và biến thể của các ký tự trước con trỏ"><button type="button" class="variant" disabled>·</button><button type="button" class="variant" disabled>·</button><button type="button" class="variant" disabled>·</button><button type="button" class="variant" disabled>·</button><button type="button" class="variant" disabled>·</button><button type="button" class="variant" disabled>·</button><button type="button" class="variant" disabled>·</button><button type="button" class="variant" disabled>·</button><button type="button" class="variant" disabled>·</button><button type="button" class="variant" disabled>·</button><button id="nom-more-btn" type="button" class="more" disabled aria-expanded="false" aria-controls="nom-more" aria-label="More Chữ Nôm candidates" data-vi-aria-label="Thêm gợi ý Chữ Nôm" title="More Chữ Nôm candidates" data-vi-title="Thêm gợi ý Chữ Nôm"><i class="fa-solid fa-caret-up"></i></button></span>
       <div id="nom-more" class="nom-more" hidden></div>

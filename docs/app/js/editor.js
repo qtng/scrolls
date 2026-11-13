@@ -17,7 +17,7 @@ const { Schema, EditorState, EditorView, Plugin, PluginKey, TextSelection, Decor
 const QATT = 'https://qatt.org';
 
 const T = (en, vi) => (window.Lang ? Lang.t(en, vi) : en);
-const MIN_COLS = 2, MAX_COLS = 40, DEFAULT_COLS = 10;
+const MIN_COLS = 2, MAX_COLS = 40, DEFAULT_COLS = 12;
 const COLS_OPTIONS = [4, 6, 8, 10, 12, 16, 20, 24, 30, 36, 42];
 const clampCols = n => Math.max(MIN_COLS, Math.min(MAX_COLS, Math.round(n) || DEFAULT_COLS));
 const el = (tag, props = {}, ...children) => { const e = Object.assign(document.createElement(tag), props); e.append(...children); return e; };
@@ -516,8 +516,9 @@ const placeholderPlugin = new Plugin({
 // ---------------------------------------------------------------- the toolbar (the format bar of the app)
 const UI = {
     view: null,
-    init(bar) {
-        this.bar = bar;
+    // parts: format (the format bar: headings, two-column text, ruby), dir (the direction, in the format bar), menu (characters per column), newPage (the title bar)
+    init(parts) {
+        this.bar = parts.format;
         const btn = (content, en, viText, run) => {
             const b = el('button', { type: 'button' });
             b.append(content);
@@ -547,10 +548,17 @@ const UI = {
             sel.addEventListener('change', () => { if (this.view) { change(sel.value); this.view.focus(); } });
             return sel;
         };
-        this.selDir = select('Page direction', 'Hướng trang', [['h', 'Horizontal', 'Ngang'], ['v', 'Vertical', 'Dọc']], v => this.setSettings({ dir: v }));
+        // the direction: one button in the title bar that turns the page (or the paragraphs of the selection) to the other direction
+        this.bDir = btn(icon('fa-grip-lines-vertical'), 'Page direction', 'Hướng trang', () => this.setSettings({ dir: this.dir === 'v' ? 'h' : 'v' }));
+        this.bDir.classList.add('dir-btn');
         this.selCols = select('Characters per column', 'Số chữ mỗi cột', COLS_OPTIONS.map(n => [String(n), String(n)]), v => this.setSettings({ cols: clampCols(+v) }));
+        const colsRow = el('label', { className: 'menu-row' }, vi('Characters per column', 'Số chữ mỗi cột'), this.selCols);
         this.bPage = btn(icon('fa-file-circle-plus'), 'New page (Ctrl+Enter)', 'Trang mới (Ctrl+Enter)', cmd(pageBreak));
-        this.bar.append(this.bH1, this.bH2, this.bWari, this.bRuby, sep(), this.selDir, this.selCols, this.bPage);
+        this.bar.append(this.bH1, this.bH2, this.bWari, this.bRuby);
+        parts.dir.append(this.bDir);
+        parts.menu.append(colsRow);
+        (parts.newPage || parts.menu).append(this.bPage);
+        void sep;
 
         window.addEventListener('resize', () => this.position());
         if (window.visualViewport) visualViewport.addEventListener('resize', () => this.position());
@@ -582,10 +590,14 @@ const UI = {
             const at = [...this.selCols.options].find(x => +x.value > c);
             this.selCols.firstChild.insertBefore(o, at || null);
         }
-        this.selDir.value = dir || '';
+        this.dir = dir;
+        this.bDir.firstChild.className = 'fa-solid ' + (dir === 'h' ? 'fa-grip-lines' : dir === 'v' ? 'fa-grip-lines-vertical' : 'fa-shuffle');
+        titled(this.bDir, dir === 'h' ? 'Horizontal page (tap: vertical)' : dir === 'v' ? 'Vertical page (tap: horizontal)' : 'Mixed (tap: vertical)',
+            dir === 'h' ? 'Trang ngang (chạm: dọc)' : dir === 'v' ? 'Trang dọc (chạm: ngang)' : 'Lẫn lộn (chạm: dọc)');
+        this.bDir.disabled = !dirs.size || !view.editable;
         this.selCols.value = c !== null ? String(c) : '';
-        this.selDir.disabled = !dirs.size;
-        this.selCols.disabled = !cols.size;
+        this.selCols.disabled = !cols.size || !view.editable;
+        this.bPage.disabled = !view.editable;
         this.position();
 
     },
@@ -776,15 +788,15 @@ const imeKeys = new Plugin({
 });
 
 // ---------------------------------------------------------------- the API for the app (app.js)
-// NomEditor.mount(element, toolbar, extra)   once: the view in `element`, the buttons in `toolbar`, more plugins first (the input)
+// NomEditor.mount(element, parts, extra)   once: the view in `element`, the buttons in parts (UI.init), more plugins first (the input)
 // NomEditor.open(content, onChange)   a document (its JSON, or null for a new one); onChange() after every change of the document
 // NomEditor.json(), .text()           the document as JSON, its text (blocks on lines of their own)
 // NomEditor.setEditable(on), .editable, .focus(), .undo(), .redo(), .canUndo(), .canRedo(), .setTelex(on), .relayout()
 let view = null, changed = null, editable = false;
 const NomEditor = {
     schema, upgrade, emptyDoc,
-    mount(element, toolbar, extra = []) {
-        UI.init(toolbar);
+    mount(element, parts, extra = []) {
+        UI.init(parts);
         const plugins = [
             ...extra,   // the input (input.js) first: its keys before the keymaps
             imeKeys,
