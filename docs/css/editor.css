@@ -26,7 +26,7 @@ body { background: var(--paper-2); }
 }
 .ProseMirror .sec { margin: 0 0 3rem; position: relative; background: var(--paper); }
 .ProseMirror .grp { position: relative; }
-.ProseMirror .grp + .grp { margin-top: 1.5rem; }   /* a change of direction */
+.ProseMirror .grp + .grp { margin-top: 1rem; padding-top: 1rem; border-top: 1px dotted color-mix(in srgb, currentColor 30%, transparent); }   /* the next page */
 .ProseMirror p, .ProseMirror h1, .ProseMirror h2 { margin: 0; font-weight: normal; font-family: inherit; }
 .ProseMirror h1 { font-size: 1.6em; }
 .ProseMirror h2 { font-size: 1.25em; }
