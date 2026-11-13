@@ -346,17 +346,22 @@ window.notesApp = { store, ready, flush() } is for the tests.
   $('set-ime').addEventListener('change', () => { setIme($('set-ime').value, true); NomEditor.focus(); });
   try { setIme(localStorage.getItem(IME_KEY)); } catch (e) { setIme('qn'); }
 
-  // the keyboard covers the lower part of the screen: the editor view ends above it. Two measures, the larger counts: the visual viewport (what is
-  // left above the keyboard) and, where there is one (Chrome on Android), the keyboard itself (navigator.virtualKeyboard: its height, the page is not resized)
-  const vv = window.visualViewport, vk = navigator.virtualKeyboard || null;
-  if (vk) { try { vk.overlaysContent = true; } catch (e) { /* the viewport measure stays */ } }
+  // the keyboard covers the lower part of the screen: the editor view ends above it. Chrome on Android shrinks the page itself (interactive-widget=resizes-content
+  // in the viewport tag); where the page keeps its size under the keyboard (Safari on the iPhone) the visual viewport tells how much is left above it.
+  const vv = window.visualViewport;
   function fitKeyboard() {
-    const byViewport = vv ? Math.max(0, window.innerHeight - vv.height - vv.offsetTop) : 0;
-    const byKeyboard = vk && vk.boundingRect ? Math.max(0, vk.boundingRect.height) : 0;
-    $('view-editor').style.bottom = Math.round(Math.max(byViewport, byKeyboard)) + 'px';
+    const inset = vv ? Math.max(0, window.innerHeight - vv.height - vv.offsetTop) : 0;
+    $('view-editor').style.bottom = Math.round(inset) + 'px';
+    if (probe) probe.textContent = `inner ${Math.round(window.innerHeight)}  visual ${vv ? Math.round(vv.height) : '-'}  top ${vv ? Math.round(vv.offsetTop) : '-'}  inset ${Math.round(inset)}\nview ${Math.round($('view-editor').getBoundingClientRect().height)}  keybar bottom ${Math.round(keybar.getBoundingClientRect().bottom)}  ${keybar.hidden ? 'keybar hidden' : 'keybar shown'}\n${matchMedia('(display-mode: standalone)').matches ? 'app' : 'tab'}  ${navigator.userAgent.replace(/^Mozilla\/5.0 /, '').slice(0, 70)}`;
+  }
+  let probe = null;
+  if (/[?&]kbd\b/.test(location.search)) {   // ?kbd: a small panel with the measures of the screen, for a phone where the bars hide behind the keyboard
+    probe = document.createElement('pre');
+    probe.style.cssText = 'position:fixed;left:4px;top:4px;z-index:99;margin:0;padding:4px 6px;font:11px/1.3 monospace;color:#0f0;background:rgba(0,0,0,.85);pointer-events:none;white-space:pre-wrap;max-width:96vw';
+    document.body.append(probe); setInterval(fitKeyboard, 500);
   }
   if (vv) { vv.addEventListener('resize', fitKeyboard); vv.addEventListener('scroll', fitKeyboard); }
-  if (vk) vk.addEventListener('geometrychange', fitKeyboard);
+  window.addEventListener('resize', fitKeyboard);
   document.addEventListener('focusin', () => setTimeout(fitKeyboard, 350));   // the keyboard comes after the focus: measure again when it is there
   document.addEventListener('focusout', () => setTimeout(fitKeyboard, 350));
 
