@@ -131,3 +131,8 @@ body.toolbar-bottom .page { padding-bottom: 50vh; }
 
 /* heading button: the H with the level beside it */
 .h-icon sub { font-size: .6em; font-weight: 700; bottom: 0; margin-left: 1px; }
+
+/* the drop-downs of the toolbar and the text button */
+.toolbar .form-select { flex: none; padding-left: .4rem; padding-right: 1.5rem; background-position: right .4rem center; width: auto; height: 2.1rem; padding-top: 0; padding-bottom: 0; font-size: .85rem; border-color: transparent; background-color: transparent; }
+.toolbar .form-select:disabled { opacity: .3; }
+.toolbar button.txt { font-weight: 600; letter-spacing: .02em; }

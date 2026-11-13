@@ -14,6 +14,7 @@ const QATT = 'https://qatt.org';
 
 const T = (en, vi) => (window.Lang ? Lang.t(en, vi) : en);
 const MIN_COLS = 2, MAX_COLS = 40, DEFAULT_COLS = 10;
+const COLS_OPTIONS = [4, 6, 8, 10, 12, 16, 20, 24, 30, 36, 42];
 const clampCols = n => Math.max(MIN_COLS, Math.min(MAX_COLS, Math.round(n) || DEFAULT_COLS));
 const el = (tag, props = {}, ...children) => { const e = Object.assign(document.createElement(tag), props); e.append(...children); return e; };
 // a text in a tag of its own with its Vietnamese text (translated by Lang of navigation.js)
@@ -359,24 +360,30 @@ const UI = {
             return b;
         };
         const icon = c => el('i', { className: 'fa-solid ' + c });
-        // two-column text: one line of big characters with two small lines between them
-        const wariIcon = () => { const w = el('span', { className: 'wari-icon' }); w.innerHTML = '<svg viewBox="0 0 16 16" width="1.15em" height="1.15em" fill="none" stroke="currentColor" stroke-linecap="round"><path d="M1.5 8h3M11.5 8h3" stroke-width="2.2"/><path d="M6 5.2h4M6 10.8h4" stroke-width="1.5"/></svg>'; return w; };
         const hIcon = n => el('span', { className: 'h-icon' }, icon('fa-heading'), el('sub', {}, String(n)));
         const sep = () => el('span', { className: 'sep' });
         const cmd = c => () => c(this.view.state, this.view.dispatch, this.view);
 
         this.bH1 = btn(hIcon(1), 'Heading', 'Tiêu đề', cmd(setHeading(1)));
         this.bH2 = btn(hIcon(2), 'Subheading', 'Tiêu đề phụ', cmd(setHeading(2)));
-        this.bWari = btn(wariIcon(), 'Two-column text', 'Chữ hai dòng', cmd(toggleWari));
-        this.bRuby = btn(icon('fa-superscript'), 'Ruby (reading)', 'Chú âm', () => RubyBox.open());
-        this.bH = btn(icon('fa-grip-lines'), 'Horizontal section', 'Phần ngang', () => this.setSection({ dir: 'h' }));
-        this.bV = btn(icon('fa-grip-lines-vertical'), 'Vertical section', 'Phần dọc', () => this.setSection({ dir: 'v' }));
-        this.bLess = btn(icon('fa-minus'), 'Fewer characters per column', 'Ít chữ hơn mỗi cột', () => this.setSection({ step: -1 }));
-        this.colsNum = el('span', { className: 'num' });
-        titled(this.colsNum, 'Characters per column', 'Số chữ mỗi cột');
-        this.bMore = btn(icon('fa-plus'), 'More characters per column', 'Nhiều chữ hơn mỗi cột', () => this.setSection({ step: 1 }));
+        this.bWari = btn(vi('split', 'chia'), 'Two-column text', 'Chữ hai dòng', cmd(toggleWari));
+        this.bWari.classList.add('txt');
+        this.bRuby = btn(icon('fa-pencil'), 'Ruby (reading)', 'Chú âm', () => RubyBox.open());
+        // the section settings are drop-downs; the group label says what the option is
+        const select = (label, labelVi, options, change) => {
+            const sel = el('select', { className: 'form-select form-select-sm' });
+            const g = el('optgroup', { label });
+            g.setAttribute('data-vi-label', labelVi);
+            for (const [value, en, viText] of options) { const o = el('option', { value }); o.textContent = en; if (viText) o.setAttribute('data-vi', viText); g.append(o); }
+            sel.append(g);
+            titled(sel, label, labelVi);
+            sel.addEventListener('change', () => { if (this.view) { change(sel.value); this.view.focus(); } });
+            return sel;
+        };
+        this.selDir = select('Text direction', 'Hướng chữ', [['h', 'Horizontal', 'Ngang'], ['v', 'Vertical', 'Dọc']], v => this.setSection({ dir: v }));
+        this.selCols = select('Characters per column', 'Số chữ mỗi cột', COLS_OPTIONS.map(n => [String(n), String(n)]), v => this.setSection({ cols: +v }));
         this.bDel = btn(icon('fa-trash'), 'Delete section', 'Xóa phần', () => this.deleteSection());
-        this.bar.append(this.bH1, this.bH2, this.bWari, this.bRuby, sep(), this.bH, this.bV, this.bLess, this.colsNum, this.bMore, sep(), this.bDel);
+        this.bar.append(this.bH1, this.bH2, this.bWari, this.bRuby, sep(), this.selDir, this.selCols, sep(), this.bDel);
 
         // the plus on an empty line (floating, as on Medium): a new section there
         this.plus = el('button', { type: 'button', className: 'scroll-plus', hidden: true });
@@ -430,12 +437,20 @@ const UI = {
         on(this.bRuby, inRuby || (!sel.empty && state.doc.rangeHasMark(sel.from, sel.to, ruby)));
         this.bRuby.disabled = !(inRuby || (!sel.empty && $f.parent === sel.$to.parent && !state.doc.rangeHasMark(sel.from, sel.to, wari)));
         const a = $f.depth >= 1 ? $f.node(1).attrs : null;
-        on(this.bH, a && a.dir === 'h');
-        on(this.bV, a && a.dir === 'v');
         const vert = !!a && a.dir === 'v';
-        this.colsNum.textContent = vert ? a.cols : '–';
-        this.bLess.disabled = !vert || a.cols <= MIN_COLS;
-        this.bMore.disabled = !vert || a.cols >= MAX_COLS;
+        if (a) {
+            this.selDir.value = a.dir;
+            const have = [...this.selCols.options].some(o => o.value === String(a.cols));
+            if (!have) {   // a value from before (or typed by hand) that the list does not have
+                const o = el('option', { value: String(a.cols) }); o.textContent = String(a.cols);
+                const opts = [...this.selCols.options];
+                const at = opts.find(x => +x.value > a.cols);
+                this.selCols.firstChild.insertBefore(o, at || null);
+            }
+            this.selCols.value = String(a.cols);
+        }
+        this.selDir.disabled = !a;
+        this.selCols.disabled = !vert;
         this.bDel.disabled = state.doc.childCount < 2;
         this.position();
 
@@ -457,9 +472,9 @@ const UI = {
             }
         }
     },
-    setSection({ dir, step }) {
+    setSection({ dir, cols }) {
         const view = this.view, sec = sectionAt(view.state.selection.$from), a = sec.node.attrs;
-        const attrs = { ...a, ...(dir ? { dir } : {}), ...(step ? { cols: clampCols(a.cols + step) } : {}) };
+        const attrs = { ...a, ...(dir ? { dir } : {}), ...(cols ? { cols: clampCols(cols) } : {}) };
         if (attrs.dir === a.dir && attrs.cols === a.cols) return;
         view.dispatch(view.state.tr.setNodeMarkup(sec.pos, null, attrs));
     },
