@@ -55,7 +55,7 @@ const schema = new Schema({
         text: { group: 'inline' },
     },
     marks: {
-        warichu: { inclusive: false, excludes: 'warichu ruby', parseDOM: [{ tag: 'span.wari' }], toDOM: () => ['span', { class: 'wari' }, 0] },
+        warichu: { excludes: 'warichu ruby', parseDOM: [{ tag: 'span.wari' }], toDOM: () => ['span', { class: 'wari' }, 0] },
         // ruby: rt = the text shown (Quốc Ngữ, PA or QATT), qn = the reading in Quốc Ngữ (to edit it again), side = over (vertical: right) or under (left)
         ruby: {
             attrs: { rt: { default: '' }, qn: { default: '' }, side: { default: 'over' } },
@@ -220,7 +220,56 @@ const setHeading = level => (state, dispatch) => {
     const on = $from.parent.type === S.heading && $from.parent.attrs.level === level;
     return on ? setBlockType(S.paragraph)(state, dispatch) : setBlockType(S.heading, { level })(state, dispatch);
 };
-const toggleWari = toggleMark(schema.marks.warichu);
+// "split" with a caret: two-column text from here on, or (pressed again) plain text from here on. The phone keyboards write into the text of the
+// page by themselves (composition) and put a letter typed at the end of two-column text into it whatever the button says; so what is typed from the
+// caret on gets (or loses) the mark afterwards, until the caret goes elsewhere (wariPlugin).
+const wariKey = new PluginKey('wari');
+function toggleWari(state, dispatch) {
+    const sel = state.selection, mark = schema.marks.warichu;
+    if (!sel.empty) return toggleMark(mark)(state, dispatch);
+    const ws = wariKey.getState(state), on = !(ws && ws.at === sel.from ? ws.on : mark.isInSet(state.storedMarks || sel.$from.marks()));
+    // on: no stored mark (a keyboard that composes the first word into a new mark writes its letters twice); the plugin marks what is typed
+    if (dispatch) dispatch(state.tr.removeStoredMark(mark).setMeta(wariKey, { at: sel.from, on }));
+    return true;
+}
+const wariPlugin = new Plugin({
+    key: wariKey,
+    state: {
+        init: () => null,
+        apply(tr, v, old, now) {
+            const m = tr.getMeta(wariKey);
+            if (m !== undefined) return m;
+            if (!v) return null;
+            const sel = now.selection;
+            if (!sel.empty || (tr.selectionSet && !tr.docChanged)) return null;   // the caret went elsewhere
+            const at = tr.mapping.map(v.at, -1);
+            if (sel.head < at || sel.$head.parent !== now.doc.resolve(at).parent) return null;
+            return { at, on: v.on };
+        },
+    },
+    appendTransaction(trs, old, state) {
+        if (wariComposing || !trs.some(t => t.docChanged)) return null;   // not while the keyboard composes a word: at its end (compositionend)
+        return wariFix(state);
+    },
+    props: {
+        handleDOMEvents: {
+            compositionstart: () => { wariComposing = true; return false; },
+            compositionend: view => {
+                wariComposing = false;
+                setTimeout(() => { const tr = wariFix(view.state); if (tr) view.dispatch(tr); }, 0);
+                return false;
+            },
+        },
+    },
+});
+let wariComposing = false;
+function wariFix(state) {
+    const v = wariKey.getState(state);
+    if (!v || state.selection.head <= v.at) return null;
+    const mark = schema.marks.warichu, tr = state.tr;
+    if (v.on) tr.addMark(v.at, state.selection.head, mark.create()); else tr.removeMark(v.at, state.selection.head, mark);
+    return tr.docChanged ? tr : null;
+}
 const openRuby = () => { RubyBox.open(); return true; };
 
 // ---------------------------------------------------------------- two-column text and bands: the layout
@@ -573,7 +622,8 @@ const UI = {
         const on = (b, v) => b.classList.toggle('on', !!v);
         on(this.bH1, p.type === S.heading && p.attrs.level === 1);
         on(this.bH2, p.type === S.heading && p.attrs.level === 2);
-        on(this.bWari, sel.empty ? wari.isInSet(state.storedMarks || $f.marks()) : state.doc.rangeHasMark(sel.from, sel.to, wari));
+        const ws = wariKey.getState(state);
+        on(this.bWari, sel.empty ? (ws ? ws.on : !!wari.isInSet(state.storedMarks || $f.marks())) : state.doc.rangeHasMark(sel.from, sel.to, wari));
         const inRuby = sel.empty && rubyAt(state, sel.from);
         on(this.bRuby, inRuby || (!sel.empty && state.doc.rangeHasMark(sel.from, sel.to, ruby)));
         this.bRuby.disabled = !(inRuby || (!sel.empty && $f.parent === sel.$to.parent && !state.doc.rangeHasMark(sel.from, sel.to, wari)));
@@ -814,6 +864,7 @@ const NomEditor = {
             placeholderPlugin,
             layoutPlugin,
             uiPlugin,
+            wariPlugin,
         ];
         view = new EditorView(element, {
             state: EditorState.create({ schema, doc: emptyDoc(), plugins }),
