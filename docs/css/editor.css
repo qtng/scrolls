@@ -112,3 +112,10 @@
 .ruby-box .rt-sugg { display: flex; flex-wrap: wrap; gap: 3px; }
 .ruby-box .rt-sugg:empty { display: none; }
 .ruby-box .rt-chip { min-width: 0; height: 1.8rem; border: 1px solid var(--bs-border-color); border-radius: 50rem; padding: 0 .55rem; font-family: var(--doc-font, var(--font-cjk)), var(--font-cjk), serif; }
+
+/* on a touch screen the menus are docked above the keyboard (editor.js) */
+.scroll-ui.docked { position: fixed; z-index: 1060; }
+
+/* the button of the section settings: small and quiet, at the corner of the section */
+.scroll-sec { width: 1.7rem; height: 1.7rem; font-size: .8rem; opacity: .7; }
+.scroll-sec.open { transform: none; opacity: 1; background: color-mix(in srgb, currentColor 12%, var(--bs-body-bg)); }
