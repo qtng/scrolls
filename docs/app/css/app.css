@@ -1,0 +1,181 @@
+/* Nôm Notes: the dark look of Qatt.org Notes (full screen like a native app, no themes, no site bars); the pages have the style of the document */
+:root { --bg: #1e1a15; --bar: #2d2720; --card: #2a251f; --ink: #f4eee2; --muted: #cfc5b3; --line: #4a4136; --accent: #e8694f; --menu: #3a332a; color-scheme: dark; }
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; touch-action: pan-x pan-y; }   /* scrolling yes, pinch zoom and double-tap zoom no */
+html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink); font: 16px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; overscroll-behavior: none; }
+[hidden] { display: none !important; }
+button { font: inherit; color: inherit; cursor: pointer; }
+/* Chữ Nôm: the fonts of the phone, then the supplements of the Chunom site for the rarer characters */
+@font-face { font-family: "NomKhai-Supplement"; src: local("__"), url("/chunom-assets/fonts/nomkhai-supplement.woff2") format("woff2"); }
+@font-face { font-family: "Han-Nom Gothic Supplement"; src: local("Han-Nom Gothic"), url("/chunom-assets/fonts/hannom-gothic-supplement.woff2") format("woff2"); }
+@font-face { font-family: "Nom Na Tong Supplement"; src: local("Nom Na Tong"), url("/chunom-assets/fonts/nomnatong-supplement.woff2?v=2") format("woff2"); }   /* 8 MB: loaded only when a character needs it */
+:root { --nom: "Nom Na Tong Supplement", "NomKhai-Supplement", "Han-Nom Gothic Supplement"; }
+
+.view { position: fixed; inset: 0; display: flex; flex-direction: column; padding-left: env(safe-area-inset-left); padding-right: env(safe-area-inset-right); }
+.appbar { position: relative; display: flex; align-items: center; gap: .25rem; min-height: calc(56px + env(safe-area-inset-top)); padding: env(safe-area-inset-top) .5rem 0 1rem; background: var(--bar); border-bottom: 1px solid var(--line); }
+#view-editor .appbar { padding-left: .25rem; }
+.appbar .title { flex: 1; min-width: 0; margin: 0; font-size: 1.25rem; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#editor-title, #title-input { font-family: var(--doc-font), var(--nom), system-ui, sans-serif; font-size: 1.4rem; line-height: 1.2; }
+#editor-title { cursor: text; }
+#title-input { height: 44px; padding: 0 .5rem; border: 1px solid var(--line); border-radius: 8px; background: rgba(255, 255, 255, .08); color: inherit; outline: 0; }
+.icon-btn { flex: none; width: 48px; height: 48px; display: grid; place-items: center; border: 0; border-radius: 50%; background: transparent; font-size: 1.25rem; }
+.icon-btn:active { background: rgba(255, 255, 255, .1); }
+
+/* the list: every document in its own style and font */
+.notes { flex: 1; margin: 0; padding: .6rem .75rem calc(96px + env(safe-area-inset-bottom)); list-style: none; overflow-y: auto; }
+.notes li + li { margin-top: .55rem; }
+.note-row { display: block; width: 100%; min-height: 64px; padding: .7rem 1rem; text-align: left; border: 1px solid var(--line); border-radius: 14px; background: var(--card); }
+.note-row:active { opacity: .85; }
+.note-title, .note-preview { font-family: var(--row-font), var(--nom), system-ui, sans-serif; }
+.note-title { display: block; font-size: 1.4rem; line-height: 1.4; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.note-title.untitled { font-family: system-ui, sans-serif; font-size: 1.1rem; opacity: .7; }
+.note-preview { display: block; opacity: .8; font-size: 1.05rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.note-date { display: block; opacity: .7; font-size: .8rem; margin-top: .1rem; }
+.empty { margin: 3rem 1rem; text-align: center; color: var(--muted); }
+.fab { position: fixed; right: calc(1rem + env(safe-area-inset-right)); bottom: calc(1rem + env(safe-area-inset-bottom)); width: 56px; height: 56px; border: 0; border-radius: 16px; background: var(--accent); color: #fff; font-size: 1.5rem; box-shadow: 0 4px 14px rgba(0, 0, 0, .55); }
+
+.menu { position: absolute; z-index: 10; top: calc(52px + env(safe-area-inset-top)); right: .5rem; min-width: 220px; padding: .25rem 0; background: rgba(58, 51, 42, .8); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 8px 24px rgba(0, 0, 0, .6);
+  max-height: calc(100vh - 72px - env(safe-area-inset-top)); max-height: calc(100dvh - 72px - env(safe-area-inset-top)); overflow-y: auto; }
+.menu button { display: flex; align-items: center; gap: .75rem; width: 100%; min-height: 48px; padding: 0 1rem; border: 0; background: transparent; text-align: left; }
+.menu button:active { background: rgba(255, 255, 255, .08); }
+.menu-group { padding: .25rem 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+.menu-label { display: block; padding: .25rem 1rem; color: var(--muted); font-size: .8rem; }
+#set-font button { padding-left: 1.25rem; }
+#set-font button[aria-checked="true"] { color: var(--accent); }
+#set-font .qsample { font-size: 1.4rem; min-width: 2.4em; }
+.menu-row { display: flex; align-items: center; gap: .75rem; min-height: 48px; padding: 0 1rem; }
+.menu-row select { margin-left: auto; max-width: 11rem; padding: .35rem; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--ink); }
+.menu-row input[type=range] { flex: 1; min-width: 0; accent-color: var(--accent); }
+.menu-sep { height: 1px; margin: .25rem 0; background: var(--line); }
+
+.snackbar { position: fixed; z-index: 20; left: 50%; bottom: calc(5.5rem + env(safe-area-inset-bottom)); transform: translateX(-50%); display: flex; align-items: center; gap: 1rem; max-width: calc(100% - 2rem); padding: .6rem 1rem; border-radius: 10px; background: #51473a; color: var(--ink); box-shadow: 0 4px 14px rgba(0, 0, 0, .6); }
+.snackbar button { min-height: 40px; padding: 0 .5rem; border: 0; background: transparent; color: var(--accent); font-weight: 600; text-transform: uppercase; }
+
+.search-bar { flex: none; padding: .5rem 1rem; background: var(--bar); border-bottom: 1px solid var(--line); }
+.search-bar input { width: 100%; min-height: 44px; padding: 0 1rem; border: 1px solid var(--line); border-radius: 22px; background: var(--bg); color: var(--ink); font-size: 1rem; outline: 0; }
+.search-bar input:focus { border-color: var(--accent); }
+
+.style-btn { flex: none; width: 34px; height: 34px; margin: 0 .5rem; padding: 0; border: 2px solid var(--ink); border-radius: 8px; background: var(--field-bg, #000); }
+#set-style button { gap: .75rem; }
+#set-style .style-sample { flex: none; min-width: 5rem; padding: .25rem .5rem; border-radius: 8px; border: 1px solid var(--line); font-family: var(--doc-font), var(--nom), serif; font-size: 1.15rem; line-height: 1.3; text-align: center; }
+#set-style button[aria-checked="true"] { color: var(--accent); }
+#edit-btn[aria-pressed="true"] { color: var(--accent); }
+.lang-switch { flex: none; display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.lang-switch button { min-width: 2.2rem; padding: .25rem .5rem; border: 0; background: transparent; font-size: .8rem; font-weight: 600; color: var(--muted); }
+.lang-switch button[aria-pressed="true"] { background: var(--accent); color: #fff; }
+.uni { font-size: 1.25em; line-height: 1; vertical-align: -.1em; }
+
+/* the format bar under the title bar: undo, redo, the input, the buttons of the editor (they scroll when the bar is narrow), the size */
+.fmtbar { position: relative; z-index: 6; flex: none; display: flex; align-items: center; gap: .25rem; padding: .3rem .5rem; background: var(--bar); border-bottom: 1px solid var(--line); }
+.fmtbar > button, .fmtbar .pop > button { display: flex; align-items: center; justify-content: center; gap: .2rem; min-width: 40px; min-height: 40px; padding: 0 .4rem; border: 1px solid var(--line); border-radius: 10px; background: transparent; white-space: nowrap; font-size: 1.1rem; }
+.fmtbar > button { flex: none; }
+.fmtbar .pop { position: relative; flex: none; }
+.fmtbar #size-btn-label { font-size: .85rem; }
+.fmtbar .caret { font-size: .65rem; opacity: .7; }
+.fmtbar button:active { background: rgba(255, 255, 255, .1); }
+.fmtbar button:disabled { opacity: .35; }
+.fmtbar button[aria-expanded="true"] { color: var(--accent); border-color: var(--accent); }
+.fmtbar .menu { top: calc(100% + 6px); left: 0; right: auto; min-width: 0; padding: .4rem; }
+.fmtbar .pop.end .menu { left: auto; right: 0; }
+#size-menu .menu-row { width: 260px; padding: 0 .4rem; }
+.fmtbar .ime-select { flex: none; min-height: 40px; max-width: 7.5rem; padding: 0 .25rem; border: 1px solid var(--line); border-radius: 8px; background: transparent; color: inherit; font-size: .8rem; }
+.fmtbar .ime-select option { color: var(--ink); background: var(--bg); }
+/* the buttons of the editor (editor.js puts them into #toolbar) */
+.tools { flex: 1 1 auto; min-width: 0; display: flex; align-items: center; gap: 2px; overflow-x: auto; scrollbar-width: none; }
+.tools::-webkit-scrollbar { display: none; }
+.tools button { flex: none; min-width: 38px; height: 40px; padding: 0 .4rem; border: 0; border-radius: 10px; background: transparent; line-height: 1; white-space: nowrap; font-size: 1rem; }
+.tools button:active { background: rgba(255, 255, 255, .1); }
+.tools button.on { color: var(--accent); background: rgba(255, 255, 255, .08); }
+.tools button:disabled { opacity: .3; }
+.tools button.txt { font-weight: 600; font-size: .9rem; }
+.tools .sep { flex: none; width: 1px; align-self: stretch; margin: 8px 3px; background: var(--line); }
+.tools select { flex: none; min-height: 40px; padding: 0 .2rem; border: 1px solid var(--line); border-radius: 8px; background: transparent; color: inherit; font-size: .85rem; }
+.tools select option, .tools select optgroup { color: var(--ink); background: var(--bg); }
+.tools select:disabled { opacity: .3; }
+.h-icon sub { font-size: .6em; font-weight: 700; bottom: 0; margin-left: 1px; }
+.reading .tools, .reading .ime-select { opacity: .35; pointer-events: none; }   /* reading: the pencil leads to editing */
+
+/* the field: the pages of the document on the dark desk of the app */
+.field { flex: 1; min-height: 0; overflow-y: auto; padding: 1rem .75rem 40vh; }
+#editor { max-width: 46rem; margin: 0 auto; }
+#editor .ProseMirror { outline: none; font-family: var(--doc-font), var(--nom), serif; font-size: var(--doc-size, 22px); }
+.ProseMirror .sec { position: relative; margin: 0 0 2rem; padding: 1rem; border-radius: 4px; background: var(--field-bg, #efe6cf); color: var(--field-ink, #1b1814); text-shadow: var(--field-shadow, none);
+  caret-color: var(--field-ink, #1b1814); box-shadow: 0 .5rem 1.5rem rgba(0, 0, 0, .45); }
+.ProseMirror .grp { position: relative; }
+.ProseMirror .grp + .grp { margin-top: 1rem; padding-top: 1rem; border-top: 1px dotted color-mix(in srgb, currentColor 35%, transparent); }   /* the next page */
+.ProseMirror p, .ProseMirror h1, .ProseMirror h2 { margin: 0; font-weight: normal; font-family: inherit; }
+.ProseMirror h1 { font-size: 1.6em; }
+.ProseMirror h2 { font-size: 1.25em; }
+/* a page of horizontal paragraphs: plain flowing text */
+.ProseMirror .grp.h { line-height: 1.6; }
+.ProseMirror .grp.h h1, .ProseMirror .grp.h h2 { line-height: 1.4; margin-bottom: .3em; }
+/* a page of vertical paragraphs: columns of --cols characters, right to left; the next band below when the width is full (multicol in the vertical
+   writing mode: its columns stack downwards). editor.js sets the height to whole bands. */
+.ProseMirror .grp.v { writing-mode: vertical-rl; text-orientation: upright; line-height: 1.6; width: 100%;
+  column-width: calc(var(--cols) * 1em); column-gap: 1.2em; column-fill: auto; column-rule: 1px solid color-mix(in srgb, currentColor 22%, transparent); }
+.ProseMirror .grp.v h1, .ProseMirror .grp.v h2 { margin-left: .3em; }
+/* two-column text: segments set by editor.js (half size, two lines = one line of the main text, whole cells) */
+.ProseMirror .wari { opacity: .8; }
+.ProseMirror .seg { display: inline-block; box-sizing: content-box; font-size: .5em; line-height: 1; block-size: 2em; vertical-align: text-top; line-break: anywhere; word-break: break-all; }
+.ProseMirror .grp.v .seg { position: relative; left: -.05em; }   /* the optical centre of the column */
+.ProseMirror .mk { display: inline-block; inline-size: 0; block-size: 1em; }
+.ProseMirror .is-empty::before { content: attr(data-placeholder); position: absolute; opacity: .5; pointer-events: none; }
+/* ruby: the base keeps its cell; the reading sits beside it (horizontal: over / under, vertical: right / left), narrowed along the line by editor.js (--rs) */
+.ProseMirror .rb { position: relative; }
+.ProseMirror .grp p:has(.rb), .ProseMirror .grp h1:has(.rb), .ProseMirror .grp h2:has(.rb) { line-height: 2.2; }
+.ProseMirror .rb .rt { position: absolute; font-size: .55em; line-height: 1; white-space: nowrap; pointer-events: none; user-select: none; opacity: .85; text-orientation: mixed; }
+.ProseMirror .grp.h .rb .rt { left: 50%; transform: translateX(-50%) scaleX(var(--rs, 1)); }
+.ProseMirror .grp.h .rb[data-side="over"] .rt { bottom: 100%; }
+.ProseMirror .grp.h .rb[data-side="under"] .rt { top: 100%; }
+.ProseMirror .grp.v .rb .rt { top: 50%; transform: translateY(-50%) scaleY(var(--rs, 1)); }
+.ProseMirror .grp.v .rb[data-side="over"] .rt { left: 100%; }
+.ProseMirror .grp.v .rb[data-side="under"] .rt { right: 100%; }
+
+/* the box to write a ruby (editor.js), under the format bar */
+.scroll-ui { position: fixed; z-index: 15; display: flex; align-items: center; gap: 2px; padding: 3px; border-radius: 12px; background: rgba(58, 51, 42, .95); color: var(--ink);
+  border: 1px solid var(--line); box-shadow: 0 8px 24px rgba(0, 0, 0, .6); font-size: .9rem; }
+.scroll-ui button { border: 0; background: transparent; color: inherit; border-radius: 8px; min-width: 2.2rem; height: 2.2rem; padding: 0 .45rem; line-height: 1; white-space: nowrap; }
+.scroll-ui button:active { background: rgba(255, 255, 255, .1); }
+.scroll-ui button.on { color: var(--accent); }
+.scroll-ui button:disabled { opacity: .35; }
+.scroll-ui .sep { width: 1px; align-self: stretch; margin: 3px 2px; background: var(--line); }
+.ruby-box { flex-direction: column; align-items: stretch; gap: 4px; padding: 6px; width: 18rem; max-width: calc(100vw - 16px); }
+.ruby-box .rt-row { display: flex; align-items: center; gap: 2px; }
+.ruby-box .rt-input { flex: 1 1 auto; min-width: 0; height: 2.2rem; padding: 0 .5rem; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--ink); font-size: 1rem; outline: 0; }
+.ruby-box .rt-input:focus { border-color: var(--accent); }
+.ruby-box .rt-preview { font-family: var(--doc-font), var(--nom), serif; font-size: 1.15rem; padding: 0 .3rem; min-height: 1.2em; }
+
+/* the key bar above the keyboard (as in Qatt.org Notes): slots of flexible width, centred; the narrow button with the triangle opens the other candidates */
+.keybar { position: relative; flex: none; display: flex; align-items: center; gap: .4rem; padding: .4rem .5rem calc(.4rem + env(safe-area-inset-bottom)); background: var(--bar); border-top: 1px solid var(--line); }
+.variants { flex: 1; min-width: 0; display: flex; justify-content: center; gap: .3rem; }
+.variant, .more { min-height: 48px; border: 1px solid var(--line); border-radius: 12px; background: var(--bg); }
+.variant { flex: 1 1 0; min-width: 0; max-width: 64px; padding: 0; overflow: hidden; white-space: nowrap; font-family: var(--doc-font), var(--nom), system-ui, sans-serif; font-size: 1.6rem; line-height: 1; }
+.more { flex: 0 0 28px; padding: 0; font-size: .8rem; }
+.variant:disabled, .more:disabled { opacity: .35; }
+.variant:not(:disabled):active, .more:not(:disabled):active, .nom-more button:active { background: rgba(255, 255, 255, .12); }
+.more[aria-expanded="true"] { color: var(--accent); border-color: var(--accent); }
+.variant.nom, .nom-more button { font-family: var(--doc-font), var(--nom), serif; }
+.nom-more { position: absolute; z-index: 5; left: .5rem; right: .5rem; bottom: 100%; max-height: 40vh; max-height: 40dvh; overflow-y: auto; display: grid; grid-template-columns: repeat(auto-fill, minmax(48px, 1fr)); gap: .3rem; padding: .4rem;
+  background: rgba(58, 51, 42, .9); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 -6px 18px rgba(0, 0, 0, .5); }
+.nom-more button { min-height: 48px; padding: 0 .2rem; border: 1px solid var(--line); border-radius: 10px; background: var(--bg); font-size: 1.6rem; line-height: 1; white-space: nowrap; }
+/* direct input: the 22 shapes in two rows of 11, in the order of the column (top, bottom, next column) */
+.directbar { display: none; flex: 1; min-width: 0; grid-template-rows: repeat(2, 44px); grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: .25rem; }
+.keybar.direct .directbar { display: grid; }
+.keybar.direct .variants, .keybar.direct .nom-more { display: none !important; }
+.directbar button { min-width: 0; padding: 0; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); font-family: var(--doc-font), system-ui, sans-serif; font-size: 1.5rem; line-height: 1; overflow: hidden; }
+.directbar button:active { background: rgba(255, 255, 255, .12); }
+
+/* the card of the font versions (menu of the list), as in Qatt.org Notes */
+.menu-version { padding: .4rem 1rem .5rem; font-size: .75rem; color: var(--muted); user-select: text; }
+.clip { position: fixed; inset: 0; z-index: 30; display: flex; align-items: center; justify-content: center; padding: 1.25rem calc(1.25rem + env(safe-area-inset-right)) calc(1.25rem + env(safe-area-inset-bottom)) calc(1.25rem + env(safe-area-inset-left)); background: rgba(0, 0, 0, .45); }
+.clip-sheet { display: flex; flex-direction: column; width: 100%; max-width: 560px; max-height: 65vh; max-height: 65dvh; border: 1px solid var(--line); border-radius: 16px; background: var(--menu); box-shadow: 0 8px 28px rgba(0, 0, 0, .65); overflow: hidden; }
+.clip-title { padding: .65rem 1rem .5rem; border-bottom: 1px solid var(--line); font-size: .85rem; letter-spacing: .02em; opacity: .75; }
+.clip-body { flex: 1; min-height: 0; padding: 1rem; overflow-y: auto; display: flex; justify-content: center; }
+.fontinfo-list { width: 100%; margin: 0; padding: 0; list-style: none; }
+.fontinfo-list li { display: flex; align-items: baseline; gap: .75rem; padding: .45rem 0; border-bottom: 1px solid var(--line); }
+.fontinfo-list li:last-child { border-bottom: 0; }
+.fontinfo-name { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.fontinfo-dates { flex: none; font-size: .8rem; color: var(--muted); text-align: right; font-variant-numeric: tabular-nums; line-height: 1.35; }
+.fontinfo-new { color: var(--accent); }
+.fontinfo-note { margin-top: .5rem; font-size: .75rem; color: var(--muted); }
+.clip-actions { display: flex; gap: .5rem; padding: .5rem; border-top: 1px solid var(--line); }
+.clip-actions button { flex: 1 1 0; display: flex; align-items: center; justify-content: center; gap: .5rem; min-height: 48px; border: 1px solid var(--line); border-radius: 12px; background: var(--bg); }
