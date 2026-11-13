@@ -502,7 +502,7 @@ window.notesApp = { store, ready, flush() } is for the tests.
   const step25 = (v, lo, hi) => Math.min(hi, Math.max(lo, Math.round((Number(v) || 100) / 25) * 25));
   // the zoom: the middle of what is seen stays where it is (a page wider than the screen scrolls sideways); a vertical page begins at its right edge
   const setZoom = (value, user) => {
-    zoom = step25(value, 50, 300);
+    zoom = Math.min(300, Math.max(50, Number(value) || 100));   // continuous (the font size moves in steps)
     $('read-zoom').value = zoom;
     const f = $('field'), cx = user && f.scrollWidth > f.clientWidth ? (f.scrollLeft + f.clientWidth / 2) / f.scrollWidth : null;
     const cy = user ? (f.scrollTop + f.clientHeight / 2) / Math.max(1, f.scrollHeight) : null;
