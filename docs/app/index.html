@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Nôm Notes</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <meta name="robots" content="noindex">
+  <meta name="theme-color" content="#2d2720">
+  <meta name="description" content="Documents in Chữ Nôm, horizontal and vertical.">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="stylesheet" href="../css/prosemirror.css">
+  <link rel="stylesheet" href="css/app.css">
+  <script src="js/lang.js"></script>
+  <script src="https://qatt.org/js/parser.js"></script>
+  <script src="https://qatt.org/js/qatt-text.js"></script>
+  <script src="https://qatt.org/js/pa-text.js"></script>
+  <script src="/chunom/js/ime.js"></script>
+  <script src="https://qatt.org/js/fonts.js"></script>
+  <script src="../js/prosemirror.js"></script>
+  <script src="js/styles.js"></script>
+  <script src="js/core.js"></script>
+  <script src="js/db.js"></script>
+  <script src="js/editor.js"></script>
+  <script src="js/app.js" defer></script>
+</head>
+<body>
+  <main id="view-list" class="view">
+    <header class="appbar">
+      <h1 class="title">Nôm Notes</h1>
+      <span id="lang-switch" class="lang-switch" role="group" aria-label="Language" data-vi-aria-label="Ngôn ngữ"><button type="button" data-lang="en" lang="en">EN</button><button type="button" data-lang="vi" lang="vi">VI</button></span>
+      <button id="search-toggle" class="icon-btn" type="button" aria-label="Search" data-vi-aria-label="Tìm kiếm"><i class="fa-solid fa-magnifying-glass"></i></button>
+      <button id="list-menu-btn" class="icon-btn" type="button" aria-label="Menu" data-vi-aria-label="Menu" aria-haspopup="true" aria-expanded="false"><i class="fa-solid fa-ellipsis-vertical"></i></button>
+      <div id="list-menu" class="menu" hidden>
+        <button id="export" type="button"><i class="fa-solid fa-file-export"></i> <span data-vi="Xuất ghi chú">Export notes</span></button>
+        <button id="import" type="button"><i class="fa-solid fa-file-import"></i> <span data-vi="Nhập ghi chú">Import notes</span></button>
+      </div>
+    </header>
+    <div id="search-bar" class="search-bar" hidden><input id="search" type="search" autocomplete="off" spellcheck="false" aria-label="Search" data-vi-aria-label="Tìm kiếm" placeholder="Search" data-vi-placeholder="Tìm kiếm"></div>
+    <input id="import-file" type="file" accept=".json,application/json" hidden>
+    <ul id="notes" class="notes"></ul>
+    <p id="empty" class="empty" hidden data-vi="Chưa có ghi chú">No notes yet</p>
+    <p id="no-results" class="empty" hidden data-vi="Không có ghi chú phù hợp">No matching notes</p>
+    <button id="new-note" class="fab" type="button" aria-label="New note" data-vi-aria-label="Ghi chú mới"><i class="fa-solid fa-plus"></i></button>
+  </main>
+  <section id="view-editor" class="view" hidden>
+    <header class="appbar">
+      <button id="back" class="icon-btn" type="button" aria-label="Back" data-vi-aria-label="Quay lại"><i class="fa-solid fa-arrow-left"></i></button>
+      <div id="editor-title" class="title" role="button" tabindex="0" aria-label="Title" data-vi-aria-label="Tiêu đề"></div>
+      <input id="title-input" class="title" type="text" hidden autocomplete="off" spellcheck="false" aria-label="Title" data-vi-aria-label="Tiêu đề">
+      <button id="edit-btn" class="icon-btn" type="button" aria-label="Edit" data-vi-aria-label="Chỉnh sửa"><i class="fa-solid fa-pencil"></i></button>
+      <button id="style-btn" class="style-btn" type="button" aria-label="Style" data-vi-aria-label="Kiểu" aria-haspopup="true" aria-expanded="false"></button>
+      <div id="style-menu" class="menu" hidden><div id="set-style" role="radiogroup"></div></div>
+      <button id="menu-btn" class="icon-btn" type="button" aria-label="Menu" data-vi-aria-label="Menu" aria-haspopup="true" aria-expanded="false"><i class="fa-solid fa-ellipsis-vertical"></i></button>
+      <div id="menu" class="menu" hidden>
+        <label class="menu-row"><span data-vi="Bảng vần">Rhyme table</span><select id="set-decoding" autocomplete="off"></select></label>
+        <div class="menu-sep" role="separator"></div>
+        <button id="menu-delete" type="button"><i class="fa-solid fa-trash"></i> <span data-vi="Xóa">Delete</span></button>
+        <div class="menu-group"><span class="menu-label" data-vi="Phông chữ">Font</span><div id="set-font" role="radiogroup"></div></div>
+      </div>
+    </header>
+    <div id="fmtbar" class="fmtbar" role="toolbar" aria-label="Format" data-vi-aria-label="Định dạng">
+      <button id="undo-btn" type="button" disabled aria-label="Undo" data-vi-aria-label="Hoàn tác" title="Undo" data-vi-title="Hoàn tác"><span class="uni" aria-hidden="true">↶</span></button>
+      <button id="redo-btn" type="button" disabled aria-label="Redo" data-vi-aria-label="Làm lại" title="Redo" data-vi-title="Làm lại"><span class="uni" aria-hidden="true">↷</span></button>
+      <select id="set-ime" class="ime-select" autocomplete="off" aria-label="Input" data-vi-aria-label="Cách nhập" title="Input" data-vi-title="Cách nhập">
+        <option value="telex" data-vi="Telex">Telex</option>
+        <option value="off" data-vi="Không Telex">No Telex</option>
+      </select>
+      <span id="toolbar" class="tools"></span>
+      <span class="pop end">
+        <button id="size-btn" type="button" aria-label="Size" data-vi-aria-label="Cỡ chữ" title="Size" data-vi-title="Cỡ chữ" aria-haspopup="true" aria-expanded="false"><span id="size-btn-label">100%</span><i class="fa-solid fa-caret-down caret"></i></button>
+        <div id="size-menu" class="menu" hidden>
+          <label class="menu-row"><span data-vi="Cỡ chữ">Size</span><input id="set-size" type="range" min="50" max="300" step="10" value="100" autocomplete="off"><output id="size-label">100%</output></label>
+        </div>
+      </span>
+    </div>
+    <div id="field" class="field"><div id="editor"></div></div>
+  </section>
+  <div id="snackbar" class="snackbar" role="status" hidden><span id="snackbar-text"></span> <button id="undo" type="button" hidden data-vi="Hoàn tác">Undo</button></div>
+</body>
+</html>
