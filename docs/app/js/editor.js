@@ -55,7 +55,7 @@ const schema = new Schema({
         text: { group: 'inline' },
     },
     marks: {
-        warichu: { excludes: 'warichu ruby', parseDOM: [{ tag: 'span.wari' }], toDOM: () => ['span', { class: 'wari' }, 0] },
+        warichu: { inclusive: false, excludes: 'warichu ruby', parseDOM: [{ tag: 'span.wari' }], toDOM: () => ['span', { class: 'wari' }, 0] },
         // ruby: rt = the text shown (Quốc Ngữ, PA or QATT), qn = the reading in Quốc Ngữ (to edit it again), side = over (vertical: right) or under (left)
         ruby: {
             attrs: { rt: { default: '' }, qn: { default: '' }, side: { default: 'over' } },

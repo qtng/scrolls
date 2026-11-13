@@ -82,6 +82,7 @@ const DocsSync = (() => {
       if (!l) { download.push(id); continue; }
       const base = Math.max(l.synced || 0, marks[id] || 0), here = l.updated > base, there = rev > base;
       if (here && there && rev === l.updated) { marks[id] = rev; l.synced = rev; continue; }   // the same version on both sides
+      if (here && there && id === skip) continue;   // a conflict of the open document waits until it is closed (a copy now would come again at every sync: it is not replaced here)
       if (here && there) {   // both changed: the newer stays, the other becomes a copy
         if (rev >= l.updated) { copies.push({ ...l, id: newId(), title: DocsCore.title(l.text || '', l.title) + ' (' + new Date(l.updated).toLocaleString() + ')', synced: 0 }); if (id !== skip) download.push(id); }
         else { download.push({ id, asCopy: true }); upload.push(l); }
