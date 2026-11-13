@@ -1,0 +1,82 @@
+/* The editor of a scroll (edit.html). Only layout and the editor's own elements; colours from the Bootstrap variables that the themes set. */
+
+.scroll-bar { display: flex; align-items: center; gap: .5rem; max-width: 52rem; margin: 1rem auto 0; padding: 0 1rem; }
+.scroll-bar .form-select { width: auto; flex: none; }
+.title-input { flex: 1 1 auto; min-width: 0; border: 0; background: transparent; color: inherit; font-size: 1.2rem; font-weight: 600; outline: none; padding: .25rem 0; }
+.title-input::placeholder { color: var(--bs-secondary-color); font-weight: 400; }
+.telex { flex: none; opacity: .45; }
+.telex[aria-pressed="true"] { opacity: 1; }
+.telex .han { font-size: 1.05rem; line-height: 1; }
+.status { flex: none; font-size: .8rem; color: var(--bs-secondary-color); white-space: nowrap; }
+@media (max-width: 575.98px) { .telex { flex: none; opacity: .45; }
+.telex[aria-pressed="true"] { opacity: 1; }
+.telex .han { font-size: 1.05rem; line-height: 1; }
+.status { display: none; } .scroll-bar #size { display: none; } }
+
+.page { max-width: 46rem; margin: 0 auto; padding: 2.5rem 1rem 40vh; }
+.message { text-align: center; color: var(--bs-secondary-color); padding: 3rem 1rem; }
+
+/* the text */
+#editor .ProseMirror {
+    outline: none;
+    font-family: var(--doc-font, var(--font-cjk)), var(--font-cjk), serif;
+    font-size: var(--doc-size, 22px);
+}
+.ProseMirror .sec { margin: 0 0 3rem; position: relative; }
+.ProseMirror p, .ProseMirror h1, .ProseMirror h2 { margin: 0; font-weight: normal; font-family: inherit; }
+.ProseMirror h1 { font-size: 1.6em; }
+.ProseMirror h2 { font-size: 1.25em; }
+
+/* horizontal section: plain flowing text */
+.ProseMirror .sec.h { line-height: 1.6; }
+.ProseMirror .sec.h h1, .ProseMirror .sec.h h2 { line-height: 1.4; margin-bottom: .3em; }
+
+/* vertical section: columns of --cols characters, right to left; the next band below when the width is full (multicol in the vertical
+   writing mode: its columns stack downwards). editor.js sets the height to whole bands. */
+.ProseMirror .sec.v {
+    writing-mode: vertical-rl;
+    line-height: 1.6;
+    width: 100%;
+    column-width: calc(var(--cols) * 1em);
+    column-gap: 1.2em;
+    column-fill: auto;
+    column-rule: 1px solid var(--bs-border-color);
+}
+.ProseMirror .sec.v h1, .ProseMirror .sec.v h2 { margin-left: .3em; }
+
+/* two-column text: segments set by editor.js (half size, two lines = one line of the main text, whole cells) */
+.ProseMirror .wari { color: color-mix(in srgb, currentColor 75%, var(--bs-body-bg)); }
+.ProseMirror .seg {
+    display: inline-block;
+    box-sizing: content-box;      /* Bootstrap sets border-box: the padding that completes a cell comes on top of the text */
+    font-size: .5em;
+    line-height: 1;
+    block-size: 2em;
+    vertical-align: text-top;     /* centred on the big characters (middle sits 0.16em off) */
+    line-break: anywhere;
+    word-break: break-all;
+}
+.ProseMirror .sec.v .seg { position: relative; left: -.05em; }   /* the optical centre of the column (about 1px at 40px) */
+.ProseMirror .mk { display: inline-block; inline-size: 0; block-size: 1em; }
+
+/* the placeholder of an empty scroll */
+.ProseMirror .is-empty::before { content: attr(data-placeholder); position: absolute; color: var(--bs-secondary-color); pointer-events: none; }
+
+/* floating controls */
+.scroll-ui { position: absolute; z-index: 1050; display: flex; align-items: center; gap: 2px; padding: 3px; border-radius: .6rem;
+    background: var(--bs-body-bg); color: var(--bs-body-color); border: 1px solid var(--bs-border-color); box-shadow: 0 .3rem 1rem rgba(0, 0, 0, .15); font-size: .85rem; }
+.scroll-ui[hidden] { display: none; }
+.scroll-ui button { border: 0; background: transparent; color: inherit; border-radius: .4rem; min-width: 2rem; height: 2rem; padding: 0 .45rem; line-height: 1; white-space: nowrap; }
+.scroll-ui button:hover { background: color-mix(in srgb, currentColor 10%, transparent); }
+.scroll-ui button.on { background: color-mix(in srgb, currentColor 18%, transparent); }
+.scroll-ui button:disabled { opacity: .35; }
+.scroll-ui .sep { width: 1px; align-self: stretch; margin: 3px 2px; background: var(--bs-border-color); }
+.scroll-ui .num { min-width: 1.6rem; text-align: center; font-variant-numeric: tabular-nums; }
+.scroll-ui .lbl { color: var(--bs-secondary-color); padding: 0 .3rem; white-space: nowrap; }
+.scroll-ui .han-btn { font-family: var(--font-cjk), serif; font-size: 1rem; }
+.scroll-plus { position: absolute; z-index: 1050; width: 2rem; height: 2rem; border-radius: 50%; border: 1px solid var(--bs-border-color);
+    background: var(--bs-body-bg); color: var(--bs-secondary-color); display: flex; align-items: center; justify-content: center; padding: 0; transition: transform .15s; }
+.scroll-plus[hidden] { display: none; }
+.scroll-plus.open { transform: rotate(45deg); }
+.scroll-plus-menu { flex-direction: column; align-items: stretch; }
+.scroll-plus-menu button { text-align: start; display: flex; align-items: center; gap: .5rem; }
