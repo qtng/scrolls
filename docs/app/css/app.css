@@ -125,7 +125,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 /* ruby: the base keeps its cell; the reading sits beside it (horizontal: over / under, vertical: right / left), narrowed along the line by editor.js (--rs) */
 .ProseMirror .rb { position: relative; }
 .ProseMirror .grp p:has(.rb), .ProseMirror .grp h1:has(.rb), .ProseMirror .grp h2:has(.rb) { line-height: 2.2; }
-.ProseMirror .rb .rt { position: absolute; font-size: .55em; line-height: 1; white-space: nowrap; pointer-events: none; user-select: none; opacity: .85; text-orientation: mixed; }
+.ProseMirror .rb .rt { position: absolute; font-size: .54em; line-height: 1; white-space: nowrap; pointer-events: none; user-select: none; opacity: .85; text-orientation: mixed; }
 .ProseMirror .grp.h .rb .rt { left: 50%; transform: translateX(-50%) scaleX(var(--rs, 1)); }
 .ProseMirror .grp.h .rb[data-side="over"] .rt { bottom: 100%; }
 .ProseMirror .grp.h .rb[data-side="under"] .rt { top: 100%; }
