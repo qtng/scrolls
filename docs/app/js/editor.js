@@ -627,11 +627,13 @@ function annotToRuby(fragment) {
     return Fragment.fromArray(out);
 }
 
-// the ruby mark at a position (the character after it, else the one before) and the range it covers in its block
-function rubyAt(state, pos) {
+// the ruby mark at a position and the range it covers in its block: the caret means the character before it (as for a new ruby), the one after
+// only at the start of a block; a selection (forward) means the character after its start
+function rubyAt(state, pos, forward = false) {
     const $pos = state.doc.resolve(pos), type = schema.marks.ruby;
     const after = $pos.nodeAfter, before = $pos.nodeBefore;
-    const mark = (after && type.isInSet(after.marks)) || (before && type.isInSet(before.marks));
+    const of = n => n && type.isInSet(n.marks);
+    const mark = forward ? of(after) : before ? of(before) : of(after);
     if (!mark) return null;
     const start = $pos.start();
     let found = null, cur = null;
@@ -644,7 +646,7 @@ function rubyAt(state, pos) {
     return found;
 }
 
-// Backspace and Delete next to a ruby: done here, not by the browser. The browser deletes beside the reading (contenteditable=false) itself and
+// Backspace and Delete next to a ruby: done here, not by the browser (Backspace behind a ruby first removes only the reading). The browser deletes beside the reading (contenteditable=false) itself and
 // leaves a wrong DOM behind (the base shown with the reading, the reading on the space before), which ProseMirror does not draw again.
 function deleteNextToRuby(view, back) {
     const { state } = view, sel = state.selection;
@@ -655,6 +657,10 @@ function deleteNextToRuby(view, back) {
     if (!(near && type.isInSet(near.marks)) && !(other && type.isInSet(other.marks))) return false;
     if (!near || !near.isText) return false;   // a page edge, a node: as usual
     const pos = sel.from;
+    if (back && type.isInSet(near.marks)) {   // Backspace behind a character with a ruby: first only the reading goes (all of it), the next one the character
+        const r = rubyAt(state, pos);
+        if (r) { view.dispatch(state.tr.removeMark(r.from, r.to, type).scrollIntoView()); return true; }
+    }
     let from, to;
     if (back) {
         const cells = cellsOf(state.doc.textBetween(Math.max(start, pos - 16), pos));
@@ -835,7 +841,7 @@ const RubyBox = {
         let range;
         if (sel.empty) range = rubyAt(state, sel.from) || cellBefore(state, sel.from);
         else if (sel.$from.parent === sel.$to.parent && !state.doc.rangeHasMark(sel.from, sel.to, schema.marks.warichu)) {
-            const r = rubyAt(state, sel.from);   // a selection inside one ruby edits it
+            const r = rubyAt(state, sel.from, true);   // a selection inside one ruby edits it
             range = { from: sel.from, to: sel.to, mark: r && r.from <= sel.from && sel.to <= r.to ? r.mark : null };
         }
         if (range && !range.mark) {   // a new ruby: not on the spaces at the ends of the selection (a ruby on a space alone is squeezed into its width)
