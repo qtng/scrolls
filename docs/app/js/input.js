@@ -84,7 +84,7 @@ const NomInput = (() => {
   // Shift+Space (a plain space after a word that stays Latin). Enter clears the candidates of the word (a second Enter is a line break)
   const dismiss = () => {
     if (!candidates().length) return false;
-    dismissed = { pos: view.state.selection.from, word: wordBefore().word };
+    dismissed = { pos: view.state.selection.from, doc: view.state.doc };
     if (api.onUpdate) api.onUpdate();
     return true;
   };
@@ -171,7 +171,15 @@ const NomInput = (() => {
       }
       return tr.docChanged || tr.selectionSet ? tr.setMeta('nomInput', true) : null;
     },
-    view(v) { view = v; return { update: () => api.onUpdate && api.onUpdate() }; },
+    view(v) {
+      view = v;
+      return {
+        update: () => {
+          if (dismissed && (dismissed.doc !== v.state.doc || dismissed.pos !== v.state.selection.from)) dismissed = null;   // any change brings the candidates back
+          if (api.onUpdate) api.onUpdate();
+        },
+      };
+    },
   });
   // block() also takes a transaction (its selection and doc)
   const blockFrom = block;
@@ -189,11 +197,11 @@ const NomInput = (() => {
     return { word: view.composing && telexOn() ? VietIme.telex(m[0]) : m[0], from: b.at - m[0].length, at: b.at };
   };
   // QATT first, PA second, then the Chữ Nôm characters (the first of them marked)
-  let dismissed = null;   // { pos, word }: Enter put the word before the caret aside; its candidates stay away until the word or the caret changes
+  let dismissed = null;   // { pos, doc }: Enter put the word before the caret aside; its candidates stay away until anything changes (the text or the caret)
   const candidates = () => {
     const w = wordBefore();
     if (!w) return [];
-    if (dismissed && dismissed.pos === view.state.selection.from && dismissed.word === w.word) return [];
+    if (dismissed) return [];
     const out = [];
     for (const sc of ['qatt', 'pa']) { const glyph = inScript(w.word, sc); if (glyph) out.push({ glyph, script: sc, run: () => put(w.from, w.at, glyph) }); }
     VietIme.lookup(w.word).forEach((c, i) => out.push({ ...c, first: i === 0, run: () => put(w.from, w.at, c.glyph) }));
