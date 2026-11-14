@@ -136,6 +136,11 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .ProseMirror .grp .rb .rt.cells { display: flex; justify-content: center; align-items: center; transform: none; }
 .ProseMirror .rb .rt.cells > span { flex: none; inline-size: 1em; display: flex; justify-content: center; }
 .ProseMirror .rb .rt.cells > span + span { margin-inline-start: var(--rg, 0); }   /* the gap between the cells (editor.js), negative where they overlap */
+/* the cinnabar line of characters read together (a name): beside the base, vertical on the right, horizontal over it; text-decoration follows the
+   characters over the end of a column or line, and the reading (positioned absolutely) does not take it */
+.ProseMirror .rb[data-line="1"] > .rb-b { text-decoration-line: underline; text-decoration-color: var(--cinnabar, #e34234); text-decoration-thickness: .07em; text-decoration-skip-ink: none; }
+.ProseMirror .grp.v .rb[data-line="1"] > .rb-b { text-underline-position: right; text-underline-offset: var(--line-v, .06em); }
+.ProseMirror .grp.h .rb[data-line="1"] > .rb-b { text-underline-position: auto; text-underline-offset: var(--line-h, -1.02em); }
 .ProseMirror .grp.h .rb .rt.cells { left: 0; right: 0; }
 .ProseMirror .grp.v .rb .rt.cells { top: 0; bottom: 0; }
 
@@ -151,6 +156,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .ruby-box .rt-row { display: flex; align-items: center; gap: 2px; }
 .ruby-box .rt-input { flex: 1 1 auto; min-width: 0; height: 2.2rem; padding: 0 .5rem; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--ink); font-size: 1rem; outline: 0; }
 .ruby-box .rt-input:focus { border-color: var(--accent); }
+.ruby-box .line-btn span { color: var(--cinnabar, #e34234); }
 .ruby-box .rt-preview { font-family: var(--doc-font), var(--nom), serif; font-size: 1.15rem; padding: 0 .3rem; min-height: 1.2em; }
 
 /* the key bar above the keyboard (as in Qatt.org Notes): slots of flexible width, centred; the narrow button with the triangle opens the other candidates */
