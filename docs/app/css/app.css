@@ -180,9 +180,10 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .scroll-ui button.on { color: var(--accent); }
 .scroll-ui button:disabled { opacity: .35; }
 .scroll-ui .sep { width: 1px; align-self: stretch; margin: 3px 2px; background: var(--line); }
-.ruby-box { flex-direction: column; align-items: stretch; gap: 4px; padding: 6px; width: 18rem; max-width: calc(100vw - 16px); }
+.ruby-box { flex-direction: column; align-items: stretch; gap: 4px; padding: 6px; width: 21rem; max-width: calc(100vw - 16px); }
 .ruby-box .rt-row { display: flex; align-items: center; gap: 2px; }
-.ruby-box .rt-input { flex: 1 1 auto; min-width: 0; height: 2.2rem; padding: 0 .5rem; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--ink); font-size: 1rem; outline: 0; }
+.ruby-box .rt-group { gap: 0; }
+.ruby-box .rt-group .rt-input { flex: 1 1 auto; min-width: 0; height: 2.2rem; padding: 0 .5rem; border: 1px solid var(--line); border-radius: 8px 0 0 8px; background: var(--bg); color: var(--ink); font-size: 1rem; outline: 0; }
 .ruby-box .rt-input:focus { border-color: var(--accent); }
 .ruby-box .deco-btn { color: var(--mark-ink); min-width: 2.2rem; font-size: 1.1rem; }
 .ruby-box .deco-btn.on { color: var(--mark-ink); background: color-mix(in srgb, var(--mark-ink) 25%, transparent); }
@@ -192,7 +193,13 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .ruby-box .rt-title { border-bottom: 1px solid var(--line); padding-bottom: 4px; }
 .ruby-box .rt-name { flex: 1 1 auto; padding: 0 .3rem; font-weight: 600; }
 .ruby-box .rt-head { padding: 2px .3rem 0; font-size: .75rem; opacity: .7; }
-.ruby-box .rt-preview { font-family: var(--doc-font), var(--nom), serif; font-size: 1.15rem; padding: 0 .3rem; min-height: 1.2em; }
+.ruby-box .rt-preview { flex: none; display: flex; align-items: center; height: 2.2rem; box-sizing: border-box; margin-left: -1px; padding: 0 .4rem; border: 1px solid var(--line); background: color-mix(in srgb, var(--ink) 6%, var(--bg)); font-family: var(--doc-font), var(--nom), serif; font-size: 1.15rem; line-height: 1; white-space: nowrap; }
+.ruby-box .rt-preview[hidden] { display: none; }
+.ruby-box .rt-radios { flex: none; display: flex; margin-left: -1px; border: 1px solid var(--line); border-radius: 0 8px 8px 0; overflow: hidden; }
+.ruby-box .rt-radios button { height: calc(2.2rem - 2px); min-width: 0; padding: 0 .5rem; border-radius: 0; font-size: .8rem; }
+.ruby-box .rt-radios button + button { border-left: 1px solid var(--line); }
+.ruby-box .rt-radios button.on { background: var(--accent); color: #fff; }
+.ruby-box .rt-sep { border-top: 1px solid var(--line); margin: 2px 0; }
 
 /* the key bar above the keyboard (as in Qatt.org Notes): slots of flexible width, centred; the narrow button with the triangle opens the other candidates */
 .keybar { position: relative; flex: none; display: flex; align-items: center; gap: .4rem; padding: .4rem .5rem calc(.4rem + env(safe-area-inset-bottom)); background: var(--bar); border-top: 1px solid var(--line); }

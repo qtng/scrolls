@@ -899,20 +899,20 @@ const RubyBox = {
             b.dataset.p = d;
             return b;
         });
-        this.shown = el('span', { className: 'rt-preview' });
+        this.shown = el('span', { className: 'rt-preview input-group-text' });
         this.eachBtn = btn(el('i', { className: 'fa-solid fa-wand-magic-sparkles' }), 'Each character its reading from the dictionary', 'Từng chữ theo từ điển', () => this.eachChar());
         this.kindBtns = Scripts.KINDS.map(([k, label]) => {
             const b = btn(label, { qn: 'Quốc Ngữ', pa: 'PA', qatt: 'QATT' }[k], { qn: 'Quốc Ngữ', pa: 'PA', qatt: 'QATT' }[k], () => this.setKind(k));
-            b.dataset.k = k;
+            b.dataset.k = k; b.setAttribute('role', 'radio');
             return b;
         });
+        this.kindGroup = el('div', { className: 'rt-radios', role: 'radiogroup' }, ...this.kindBtns);
         const head = (en, vi) => el('div', { className: 'rt-head', textContent: en, 'data-vi': vi });
         this.box = el('div', { className: 'scroll-ui ruby-box bg-light', hidden: true },
-            el('div', { className: 'rt-row rt-title' }, el('span', { className: 'rt-name', textContent: 'Annotation', 'data-vi': 'Chú thích' }), this.ok, this.del),
+            el('div', { className: 'rt-row rt-title' }, el('span', { className: 'rt-name', textContent: 'Annotation', 'data-vi': 'Chú thích' }), this.eachBtn, this.ok, this.del),
             head('Reading', 'Cách đọc'),
-            el('div', { className: 'rt-row' }, this.input),
-            el('div', { className: 'rt-row' }, this.shown),
-            el('div', { className: 'rt-row' }, ...this.kindBtns, el('span', { className: 'sep' }), this.eachBtn),
+            el('div', { className: 'rt-row rt-group' }, this.input, this.shown, this.kindGroup),
+            el('div', { className: 'rt-sep' }),
             head('Emphasis', 'Nhấn mạnh'),
             el('div', { className: 'rt-row' }, ...this.decoBtns.slice(0, 5)),
             head('Marks', 'Dấu'),
@@ -926,7 +926,6 @@ const RubyBox = {
     isOpen() { return this.box && !this.box.hidden; },
     async open() {
         const { state } = this.view, sel = state.selection;
-        this.kbd = this.view.hasFocus();   // the keyboard of the phone follows the editor: it stays as it was when the box opened and closes
         let range;
         if (sel.empty) range = rubyAt(state, sel.from) || cellBefore(state, sel.from);
         else if (sel.$from.parent === sel.$to.parent && !state.doc.rangeHasMark(sel.from, sel.to, schema.marks.warichu)) {
@@ -951,6 +950,7 @@ const RubyBox = {
         this.markKind(); this.markDeco();
         this.box.hidden = false;
         this.place();
+        this.input.focus({ preventScroll: true });   // the reading is what one types first
         if (this.kind !== 'qn') await Scripts.load();
         this.preview();
         this.place();
@@ -972,7 +972,7 @@ const RubyBox = {
         for (const b of this.punctBtns) b.classList.toggle('on', b.dataset.p === this.punct);
     },
     markKind() {
-        for (const b of this.kindBtns) b.classList.toggle('on', b.dataset.k === this.kind);
+        for (const b of this.kindBtns) { b.classList.toggle('on', b.dataset.k === this.kind); b.setAttribute('aria-checked', String(b.dataset.k === this.kind)); }
     },
     async setKind(k) {
         this.kind = k;
@@ -1009,8 +1009,7 @@ const RubyBox = {
         this.box.hidden = true;
         if (this.ime) this.ime.hide();
         this.range = null;
-        if (focus && this.kbd) this.view.focus();
-        else if (document.activeElement === this.input) this.input.blur();
+        if (focus) this.view.focus();
         UI.refresh();
     },
 };
