@@ -900,21 +900,22 @@ const RubyBox = {
             return b;
         });
         this.shown = el('span', { className: 'rt-preview input-group-text' });
-        this.eachBtn = btn(el('i', { className: 'fa-solid fa-wand-magic-sparkles' }), 'Each character its reading from the dictionary', 'Từng chữ theo từ điển', () => this.eachChar());
+        this.eachBtn = btn(el('i', { className: 'fa-solid fa-wand-magic-sparkles' }), 'Fill in the readings from the dictionary (every character its own)', 'Điền cách đọc từ từ điển (từng chữ)', () => this.eachChar());
         this.kindBtns = Scripts.KINDS.map(([k, label]) => {
-            const b = btn(label, { qn: 'Quốc Ngữ', pa: 'PA', qatt: 'QATT' }[k], { qn: 'Quốc Ngữ', pa: 'PA', qatt: 'QATT' }[k], () => this.setKind(k));
+            const b = btn(k === 'qn' ? el('span', { textContent: 'Text', 'data-vi': 'Chữ' }) : label, { qn: 'Text (Quốc Ngữ)', pa: 'PA', qatt: 'QATT' }[k], { qn: 'Chữ (Quốc Ngữ)', pa: 'PA', qatt: 'QATT' }[k], () => this.setKind(k));
             b.dataset.k = k; b.setAttribute('role', 'radio');
             return b;
         });
         this.kindGroup = el('div', { className: 'rt-radios', role: 'radiogroup' }, ...this.kindBtns);
         const head = (en, vi) => el('div', { className: 'rt-head', textContent: en, 'data-vi': vi });
         this.box = el('div', { className: 'scroll-ui ruby-box bg-light', hidden: true },
-            el('div', { className: 'rt-row rt-title' }, el('span', { className: 'rt-name', textContent: 'Annotation', 'data-vi': 'Chú thích' }), this.eachBtn, this.ok, this.del),
-            head('Reading', 'Cách đọc'),
-            el('div', { className: 'rt-row rt-group' }, this.input, this.shown, this.kindGroup),
+            el('div', { className: 'rt-row rt-title' }, el('span', { className: 'rt-name', textContent: 'Annotation', 'data-vi': 'Chú thích' }), this.ok, this.del),
+            el('div', { className: 'rt-row rt-headrow' }, head('Reading', 'Cách đọc'), this.eachBtn),
+            el('div', { className: 'rt-row rt-group' }, this.shown, this.input, this.kindGroup),
             el('div', { className: 'rt-sep' }),
             head('Emphasis', 'Nhấn mạnh'),
             el('div', { className: 'rt-row' }, ...this.decoBtns.slice(0, 5)),
+            el('div', { className: 'rt-sep' }),
             head('Marks', 'Dấu'),
             el('div', { className: 'rt-row' }, ...this.decoBtns.slice(5)),
             el('div', { className: 'rt-row' }, ...this.punctBtns));
@@ -946,7 +947,6 @@ const RubyBox = {
         this.input.value = mark ? (mark.attrs.qn || mark.attrs.rt) : '';
         this.base = state.doc.textBetween(range.from, range.to);
         this.del.hidden = !mark;
-        this.eachBtn.hidden = [...this.base].length < 2;
         this.markKind(); this.markDeco();
         this.box.hidden = false;
         this.place();
