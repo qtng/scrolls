@@ -68,10 +68,16 @@ window.notesApp = { store, ready, flush() } is for the tests.
     saveTimer = setTimeout(save, 400);
   }
   let saving = Promise.resolve();
+  const known = {};   // id: the version of the document this window last read or wrote (another window may have written a newer one since)
   function save() {
     clearTimeout(saveTimer); saveTimer = null;
     const doc = state.current;
     if (!doc || !state.dirty || state.shared) return saving;
+    const written = writtenElsewhere(doc.id);
+    if (written) {   // another window saved this document since: nothing is written over it, the user chooses
+      saving = saving.then(async () => { try { const d = await state.store.get(doc.id); if (d && state.current === doc) askConflict(d, true); } catch (e) { /* asked at the next save */ } });
+      return saving;
+    }
     state.dirty = false;
     const text = NomEditor.text();
     if (!/\S/.test(text) && !doc.title && !state.inStore) return saving;   // a new document that stays empty
@@ -82,6 +88,7 @@ window.notesApp = { store, ready, flush() } is for the tests.
     saving = saving.then(async () => {
       try {
         await state.store.put(copy);
+        known[copy.id] = copy.updated;
         state.inStore = true;
         const i = state.docs.findIndex(d => d.id === copy.id);
         if (i < 0) state.docs.push(copy); else state.docs[i] = copy;
@@ -143,8 +150,8 @@ window.notesApp = { store, ready, flush() } is for the tests.
     buttons();
     renderKeys();
   }
-  const stopEditing = () => { setEditing(false); save(); };
-  $('edit-btn').addEventListener('click', () => { setEditing(true, true); NomEditor.focus(); });
+  const stopEditing = () => { setEditing(false); save().then(() => freshen()); };
+  $('edit-btn').addEventListener('click', () => { setEditing(true, true); NomEditor.focus(); freshen(); });
   let lastTap = { t: 0, x: 0, y: 0 };
   $('field').addEventListener('pointerup', e => {   // a double tap in the reading view starts editing there (dblclick is not sent on every phone)
     if (NomEditor.editable || state.shared) return;
@@ -154,6 +161,7 @@ window.notesApp = { store, ready, flush() } is for the tests.
       const view = NomEditor.view, at = view.posAtCoords({ left: e.clientX, top: e.clientY });
       NomEditor.focus();
       if (at) view.dispatch(view.state.tr.setSelection(PM.TextSelection.near(view.state.doc.resolve(at.pos))));
+      freshen();
     } else lastTap = { t: e.timeStamp, x: e.clientX, y: e.clientY };
   });
 
@@ -176,7 +184,7 @@ window.notesApp = { store, ready, flush() } is for the tests.
   }
   function showEditor(doc, fresh, shared) {
     state.shared = !!shared; $('view-editor').classList.toggle('shared', !!shared); $('keep-btn').hidden = $('home-logo').hidden = !shared;
-    state.current = doc; state.inStore = !fresh; state.dirty = false;
+    state.current = doc; state.inStore = !fresh; state.dirty = false; known[doc.id] = doc.updated;
     closeMenu();
     $('view-list').hidden = true;
     $('view-editor').hidden = false;
@@ -194,7 +202,7 @@ window.notesApp = { store, ready, flush() } is for the tests.
     const editing = NomEditor.editable, top = $('field').scrollTop, focused = editing && document.activeElement && document.activeElement.closest('.ProseMirror');
     const caret = NomEditor.caret();
     const formatChanged = JSON.stringify(state.current.format || null) !== JSON.stringify(doc.format || null);
-    state.current = { ...doc }; state.inStore = true; state.dirty = false;
+    state.current = { ...doc }; state.inStore = true; state.dirty = false; known[doc.id] = doc.updated;
     applyStyle(doc);
     if (formatChanged) applyFormat(doc);
     if (!NomEditor.open(doc.content || null, edited)) snack('Parts of this document could not be read', 'Không đọc được một phần của ghi chú này', { sticky: true });
@@ -222,7 +230,8 @@ window.notesApp = { store, ready, flush() } is for the tests.
     const id = decodeURIComponent(m[1]);
     if (state.current && state.current.id === id) return;
     await save();
-    const doc = state.docs.find(d => d.id === id);
+    let doc = state.docs.find(d => d.id === id);
+    try { const s = await state.store.get(id); if (s && (!doc || s.updated > doc.updated)) doc = s; } catch (e) { /* the one in memory */ }   // a fresh copy (another window may have saved it)
     if (!doc) { history.replaceState(null, '', '#/'); return showList(); }
     showEditor({ ...doc }, false);
     lastActive = Date.now();
@@ -748,11 +757,67 @@ window.notesApp = { store, ready, flush() } is for the tests.
       if (againQueued) { againQueued = false; sync(); }
     }
   }
+  // ----- other windows (tabs, the installed app) share the storage of the browser: every write is noted in localStorage (id: updated, 0 = deleted);
+  // every 5 s the notes are compared with this window's own writes. A newer version of the open document is loaded and the window goes to the reading
+  // mode (with changes not yet saved here: the user chooses); the list is read again. Opening, editing and reading take a fresh copy too.
+  const WRITES = 'nomNotesWrites', ownWrites = {};
+  function stampWrite(id, updated) {
+    ownWrites[id] = updated;
+    try { const m = JSON.parse(localStorage.getItem(WRITES) || '{}'); m[id] = updated; localStorage.setItem(WRITES, JSON.stringify(m)); } catch (e) { /* not noted */ }
+  }
+  function writtenElsewhere(id) {   // the version another window wrote after the one known here (0: none)
+    let m; try { m = JSON.parse(localStorage.getItem(WRITES) || '{}'); } catch (e) { return 0; }
+    const u = m[id];
+    return u && known[id] !== undefined && u > known[id] && ownWrites[id] !== u ? u : 0;
+  }
+  function stamped(st) {
+    return { ...st,
+      put: async d => { await st.put(d); stampWrite(d.id, d.updated); },
+      putMany: async ds => { await st.putMany(ds); ds.forEach(d => stampWrite(d.id, d.updated)); },
+      remove: async id => { await st.remove(id); stampWrite(id, 0); } };
+  }
+  // the open document from the storage, if another window saved a newer version (toReading: then to the reading mode)
+  async function freshen(toReading) {
+    const cur = state.current;
+    if (!cur || state.shared) return;
+    let doc; try { doc = await state.store.get(cur.id); } catch (e) { return; }
+    if (!doc || state.current !== cur || doc.updated <= cur.updated) return;
+    if (state.dirty || saveTimer) { askConflict(doc, true); return; }
+    const i = state.docs.findIndex(d => d.id === doc.id); if (i >= 0) state.docs[i] = doc;
+    reload(doc);
+    if (toReading && NomEditor.editable) { if (history.state && history.state.edit) history.back(); else setEditing(false); }
+  }
+  let writesSeen = null;
+  setInterval(async () => {
+    if (!app.ready) return;
+    let raw; try { raw = localStorage.getItem(WRITES); } catch (e) { return; }
+    if (raw === writesSeen) return;
+    writesSeen = raw;
+    let m; try { m = JSON.parse(raw) || {}; } catch (e) { return; }
+    const other = Object.entries(m).filter(([id, u]) => ownWrites[id] !== u);
+    if (!other.length) return;
+    other.forEach(([id, u]) => { ownWrites[id] = u; });   // seen
+    try {
+      const fresh = await state.store.all();
+      const cur = state.current;
+      state.docs = fresh.map(d => { const mine = cur && d.id === cur.id ? state.docs.find(x => x.id === d.id) : null; return mine && mine.updated > d.updated ? mine : d; });
+      if (!cur) { renderList(); return; }
+    } catch (e) { return; }
+    const cur = state.current;
+    if (cur && !state.shared && other.some(([id]) => id === cur.id)) {
+      if (m[cur.id] === 0 && !state.dirty && !saveTimer) {   // deleted in another window
+        snack('This note was deleted in another window', 'Ghi chú này đã bị xóa trong cửa sổ khác');
+        state.current = null; state.dirty = false;
+        history.replaceState(null, '', '#/'); route();
+      } else await freshen(true);
+    }
+  }, 5000);
+
   // the newer version of the open document from the account replaces it
-  async function takeIncoming(doc) {
+  async function takeIncoming(doc, local) {
     clearTimeout(saveTimer); saveTimer = null; state.dirty = false;
     await saving;   // a save of what was typed meanwhile ends before the newer version is kept
-    await DocsSync.take(doc, state.store);
+    if (!local) await DocsSync.take(doc, state.store);   // (a version of another window is in the storage already)
     const i = state.docs.findIndex(d => d.id === doc.id);
     if (i < 0) state.docs.push(doc); else state.docs[i] = doc;
     reload(doc);
@@ -760,8 +825,13 @@ window.notesApp = { store, ready, flush() } is for the tests.
   // a conflict of the open document: the version of the other device, the own one (saved over the other), or the own one as a new note
   let conflictDoc = null;
   const stamp = ms => new Date(ms).toLocaleString(Lang.current === 'vi' ? 'vi-VN' : undefined, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', second: '2-digit' });
-  function askConflict(remote) {
-    conflictDoc = remote;   // asked already: the newest version of the other device counts
+  let conflictLocal = false;
+  function askConflict(remote, local) {
+    conflictDoc = remote; conflictLocal = !!local;   // asked already: the newest version of the other device counts
+    const both = (el, en, vi) => { el.setAttribute('data-en', en); el.setAttribute('data-vi', vi); el.textContent = Lang.current === 'vi' ? vi : en; };   // a text of both languages that changes
+    both($('conflict-title'), local ? 'This note was changed in another window' : 'This note was changed on another device', local ? 'Ghi chú này đã được sửa trong cửa sổ khác' : 'Ghi chú này đã được sửa trên thiết bị khác');
+    both($('conflict-other'), local ? 'Other window' : 'Other device', local ? 'Cửa sổ khác' : 'Thiết bị khác');
+    both($('conflict-theirs-label'), local ? "The other window's" : "The other device's", local ? 'Của cửa sổ khác' : 'Của thiết bị khác');
     $('conflict-theirs-time').textContent = stamp(remote.updated);
     $('conflict-mine-time').textContent = stamp(state.current.updated);
     if (!$('conflict').hidden) return;
@@ -773,14 +843,15 @@ window.notesApp = { store, ready, flush() } is for the tests.
     const d = conflictDoc; conflictDoc = null;
     return d && state.current && state.current.id === d.id && !state.shared ? d : null;
   };
-  $('conflict-theirs').addEventListener('click', async () => { const d = endConflict(); if (d) await takeIncoming(d); });
+  $('conflict-theirs').addEventListener('click', async () => { const local = conflictLocal, d = endConflict(); if (d) await takeIncoming(d, local); });
   $('conflict-mine').addEventListener('click', async () => {
     const d = endConflict(); if (!d) return;
-    DocsSync.mark(d.id, d.synced);   // the own version is based on the one of the other device now: it is saved over it
-    state.current.synced = d.synced;
+    known[d.id] = Math.max(known[d.id] || 0, d.updated || 0);   // based on the other version now (also another window's)
+    if (d.synced) { DocsSync.mark(d.id, d.synced); state.current.synced = d.synced; }   // the own version is based on the other one now: it is saved over it
     state.dirty = true; await save();
-    if (state.current && state.current.updated <= d.synced) {   // a clock behind the other device: the own version must still count as the newer one
-      state.current.updated = d.synced + 1;
+    const other = Math.max(d.synced || 0, d.updated || 0);
+    if (state.current && state.current.updated <= other) {   // a clock behind the other device: the own version must still count as the newer one
+      state.current.updated = other + 1;
       const copy = { ...state.current };
       await state.store.put(copy);
       const i = state.docs.findIndex(x => x.id === copy.id); if (i >= 0) state.docs[i] = copy;
@@ -788,12 +859,12 @@ window.notesApp = { store, ready, flush() } is for the tests.
     sync();
   });
   $('conflict-copy').addEventListener('click', async () => {
-    const d = endConflict(); if (!d) return;
+    const local = conflictLocal, d = endConflict(); if (!d) return;
     const now = Date.now(), text = NomEditor.text();
     const copy = { ...state.current, content: NomEditor.json(), text, id: newId(), title: DocsCore.title(text, state.current.title) + ' (' + Lang.t('copy', 'bản sao') + ')', created: now, updated: now, synced: 0 };
     try { await state.store.put(copy); } catch (e) { warnUnsaved(); }
     state.docs.push(copy);
-    await takeIncoming(d);
+    await takeIncoming(d, local);
     snack('Your version was kept as a copy', 'Phiên bản của bạn đã được lưu thành bản sao');
     syncSoon();
   });
@@ -936,8 +1007,8 @@ window.notesApp = { store, ready, flush() } is for the tests.
 
   // ----- start -----
   (async () => {
-    try { state.store = await DocsDB.open(); state.docs = await state.store.all(); }
-    catch (e) { state.store = DocsDB.memory(); warnUnsaved(); }
+    try { state.store = stamped(await DocsDB.open()); state.docs = await state.store.all(); }
+    catch (e) { state.store = stamped(DocsDB.memory()); warnUnsaved(); }
     app.store = state.store;
     await DocsSync.init();
     renderAccount();
