@@ -189,6 +189,19 @@ window.notesApp = { store, ready, flush() } is for the tests.
     setEditing(fresh, false);
     if (fresh) NomEditor.focus();
   }
+  // the open document is replaced by its newer version from the account (sync): the mode and the place stay
+  function reload(doc) {
+    const editing = NomEditor.editable, top = $('field').scrollTop, focused = editing && document.activeElement && document.activeElement.closest('.ProseMirror');
+    const formatChanged = JSON.stringify(state.current.format || null) !== JSON.stringify(doc.format || null);
+    state.current = { ...doc }; state.inStore = true; state.dirty = false;
+    applyStyle(doc);
+    if (formatChanged) applyFormat(doc);
+    if (!NomEditor.open(doc.content || null, edited)) snack('Parts of this document could not be read', 'Không đọc được một phần của ghi chú này', { sticky: true });
+    setEditing(editing, false);
+    showTitle();
+    $('field').scrollTop = top;
+    if (focused) NomEditor.focus();
+  }
   async function showList() {
     await save();
     state.current = null; state.shared = false; $('view-editor').classList.remove('shared');
@@ -209,6 +222,7 @@ window.notesApp = { store, ready, flush() } is for the tests.
     const doc = state.docs.find(d => d.id === id);
     if (!doc) { history.replaceState(null, '', '#/'); return showList(); }
     showEditor({ ...doc }, false);
+    if (app.ready) sync();   // the account may have a newer version of it
   }
   // a link: the document is loaded by its code and shown for reading (the logo leads to the list when signed in, else to the homepage)
   async function showShared(code) {
@@ -674,7 +688,7 @@ window.notesApp = { store, ready, flush() } is for the tests.
     await saving;   // a save that is already running ends before the document is removed
     if (wasStored) {
       try { await state.store.remove(doc.id); } catch (e) { warnUnsaved(); }
-      if (doc.synced) DocsSync.forget(doc.id);
+      if (doc.synced) DocsSync.forget(doc.id, doc.synced);
       state.docs = state.docs.filter(d => d.id !== doc.id);
     }
     if (/\S/.test(snapshot.text) || wasStored) { snack('Deleted', 'Đã xóa', { undo: true }); deleted = snapshot; }
@@ -699,12 +713,19 @@ window.notesApp = { store, ready, flush() } is for the tests.
     if (byHand) snack('Syncing…', 'Đang đồng bộ…', { sticky: true });
     try {
       await save();
-      const started = Date.now();
-      const r = await DocsSync.run(state.docs, state.store, { skip: state.current && state.current.id });
+      const started = Date.now(), open = state.current && !state.shared ? state.current : null, openAt = open && open.updated;
+      const r = await DocsSync.run(state.docs, state.store, { skip: open && open.id });
       const cur = new Map(state.docs.map(d => [d.id, d]));   // what was typed or made while the sync ran stays (the sync worked on the documents as they were at its start)
       state.docs = r.docs.map(d => { const c = cur.get(d.id); return c && c.updated > d.updated ? { ...c, synced: d.synced } : d; })
         .concat(state.docs.filter(c => !r.docs.some(d => d.id === c.id) && c.created >= started));
       if (state.current) { const d = r.docs.find(x => x.id === state.current.id); if (d) state.current.synced = d.synced; }
+      // the open document is newer in the account: taken if nothing was typed since the sync began (else what was typed wins at the next sync)
+      if (r.incoming && open && state.current === open && open.updated === openAt && !state.dirty) {
+        await DocsSync.take(r.incoming, state.store);
+        const i = state.docs.findIndex(d => d.id === r.incoming.id);
+        if (i < 0) state.docs.push(r.incoming); else state.docs[i] = r.incoming;
+        reload(r.incoming);
+      }
       if (!state.current && r.changed) renderList();
       if (byHand) snack('Synced', 'Đã đồng bộ');
     } catch (e) {
@@ -727,6 +748,7 @@ window.notesApp = { store, ready, flush() } is for the tests.
   });
   $('sync-now').addEventListener('click', () => { closeMenu(); sync(true); });
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') sync(); });
+  setInterval(() => { if (document.visibilityState === 'visible') sync(); }, 30000);   // an open document follows the changes of another device
 
   document.addEventListener('gesturestart', e => e.preventDefault());
 

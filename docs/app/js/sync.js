@@ -4,23 +4,28 @@ The app works on the documents in the browser (db.js); signed in, it compares th
 some seconds after a change and by hand) and takes the newer side of each document. A row: id (= the id of the document), title (the title shown, for other
 lists), content (the ProseMirror JSON), settings: { app: 'nom-notes', updated, created, text, title?, format?, style? } (`updated` in milliseconds is the
 version that is compared). Rows of the first editor of Scrolls (no settings.app) are taken over as they are (their content is converted by the editor).
-Both sides changed since the last sync: the newer one stays where it is and the other one becomes a copy of its own (nothing is lost).
-A document deleted here is deleted in the account at the next sync (its id waits in localStorage "nomNotesDeleted"); one deleted in the account
-(by another device) goes here too if it had been synced before.
+Both sides changed since the last sync: the newer one wins, the other one is dropped (no copies). The open document is not replaced under the hands of
+the user: run() hands its newer version to the app, which takes it only if nothing was typed meanwhile (else the next sync uploads what was typed).
+A document deleted here is deleted in the account at the next sync (its id and version wait in localStorage "nomNotesDeleted"), unless it was changed
+there after the version known here (then it comes back); one deleted in the account (by another device) goes here too if it had been synced before and
+was not changed here since (else it is uploaded again).
 
   await DocsSync.init()          the user (signed in for real) or null
   DocsSync.user, DocsSync.service the SupabaseService (js/supabase.js of qatt.org) for the login dialog
-  await DocsSync.run(local, store, { skip })   local: the documents of the browser; store: db.js; skip: the id of the open document (not downloaded now)
-                                 returns { docs, changed }: the documents after the sync and whether any changed here
+  await DocsSync.run(local, store, { skip })   local: the documents of the browser; store: db.js; skip: the id of the open document (its newer version comes as incoming)
+                                 returns { docs, changed, incoming }: the documents after the sync, whether any changed here, and the newer version of
+                                 the open document from the account (or null)
+  await DocsSync.take(doc, store)  the app took incoming: kept in the browser and marked as synced
   DocsSync.shareCode(id)         the code of the link of a document of the account (null: not shared); shareCreate(id) makes it, shareEnd(id) deletes it
   await DocsSync.shareGet(code)  the shared document (as a document of the app) or null; works without an account
-  DocsSync.forget(id)            a document deleted here: delete it in the account at the next sync (unforget(id): it came back)
+  DocsSync.forget(id, rev)       a document deleted here (rev: its synced version): delete it in the account at the next sync (unforget(id): it came back)
 */
 const DocsSync = (() => {
   const DEL_KEY = 'nomNotesDeleted';
   let sp = null, user = null;
-  const deletedIds = () => { try { return JSON.parse(localStorage.getItem(DEL_KEY)) || []; } catch (e) { return []; } };
-  const keepDeleted = ids => { try { localStorage.setItem(DEL_KEY, JSON.stringify([...new Set(ids)])); } catch (e) { /* not kept */ } };
+  // the documents deleted here: { id, rev } (rev: the version known here; an old entry is only the id)
+  const deletedIds = () => { try { return (JSON.parse(localStorage.getItem(DEL_KEY)) || []).map(g => (typeof g === 'string' ? { id: g, rev: null } : g)); } catch (e) { return []; } };
+  const keepDeleted = list => { try { localStorage.setItem(DEL_KEY, JSON.stringify(list)); } catch (e) { /* not kept */ } };
   const newId = () => crypto.randomUUID();
   // the version of each document that is known to be the same in the account ("synced up to here"): kept apart from the documents, so that a save of
   // the open document (which may have an older value of `synced`) cannot lose it; without it the next start would see a conflict that is none
@@ -61,54 +66,53 @@ const DocsSync = (() => {
   };
 
   async function run(local, store, { skip } = {}) {
-    if (!user) return { docs: local, changed: false };
+    if (!user) return { docs: local, changed: false, incoming: null };
     const db = sp.client;
     const { data, error } = await db.from('scrolls').select('id, updated_at, rev:settings->updated');
     if (error) throw error;
     const remote = new Map(data.map(r => [r.id, revOf(r)]));
-    // what was deleted here goes in the account too
-    const gone = deletedIds(), toDelete = gone.filter(id => remote.has(id));
+    const marks = loadSynced();
+    // what was deleted here goes in the account too, unless it was changed there after the version known here (then it comes back)
+    const toDelete = deletedIds().filter(g => remote.has(g.id) && (g.rev == null || remote.get(g.id) <= g.rev)).map(g => g.id);
     if (toDelete.length) {
       const { error: e } = await db.from('scrolls').delete().in('id', toDelete);
       if (e) throw e;
-      toDelete.forEach(id => remote.delete(id));
+      toDelete.forEach(id => { remote.delete(id); delete marks[id]; });
     }
     keepDeleted([]);
     const docs = new Map(local.map(d => [d.id, { ...d }]));
-    const marks = loadSynced(), download = [], upload = [], copies = [];
-    let changed = false;
+    const download = [], upload = [];
+    let changed = false, incoming = null;
     for (const [id, rev] of remote) {
       const l = docs.get(id);
       if (!l) { download.push(id); continue; }
       const base = Math.max(l.synced || 0, marks[id] || 0), here = l.updated > base, there = rev > base;
       if (here && there && rev === l.updated) { marks[id] = rev; l.synced = rev; continue; }   // the same version on both sides
-      if (here && there && id === skip) continue;   // a conflict of the open document waits until it is closed (a copy now would come again at every sync: it is not replaced here)
-      if (here && there) {   // both changed: the newer stays, the other becomes a copy
-        if (rev >= l.updated) { copies.push({ ...l, id: newId(), title: DocsCore.title(l.text || '', l.title) + ' (' + new Date(l.updated).toLocaleString() + ')', synced: 0 }); if (id !== skip) download.push(id); }
-        else { download.push({ id, asCopy: true }); upload.push(l); }
-      } else if (there) { if (id !== skip) download.push(id); }
+      if (here && there) { if (l.updated > rev) upload.push(l); else download.push(id); }   // both changed: the newer one wins (no copy)
+      else if (there) download.push(id);
       else if (here) upload.push(l);
     }
     for (const l of docs.values()) if (!remote.has(l.id)) {
-      if ((l.synced || marks[l.id]) && l.id !== skip) { docs.delete(l.id); delete marks[l.id]; await store.remove(l.id); changed = true; }   // deleted in the account
-      else upload.push(l);
+      const base = Math.max(l.synced || 0, marks[l.id] || 0);
+      if (base && l.updated <= base) {   // deleted in the account, not changed here since (the open document goes when it is closed)
+        if (l.id !== skip) { docs.delete(l.id); delete marks[l.id]; await store.remove(l.id); changed = true; }
+      }
+      else upload.push(l);   // new here, or changed here after it was deleted in the account: it stays
     }
-    // the rows that are newer there
-    const ids = download.map(d => (typeof d === 'string' ? d : d.id));
-    for (let i = 0; i < ids.length; i += 50) {
-      const part = ids.slice(i, i + 50);
+    // the rows that are newer there; the open document is handed to the app (it takes it if nothing was typed meanwhile, see take())
+    for (let i = 0; i < download.length; i += 50) {
+      const part = download.slice(i, i + 50);
       const { data: rows, error: e } = await db.from('scrolls').select('id, title, settings, content, created_at, updated_at').in('id', part);
       if (e) throw e;
       for (const row of rows) {
-        const doc = fromRow(row), copy = download.find(d => typeof d !== 'string' && d.id === row.id);
-        if (copy) { const c = { ...doc, id: newId(), title: DocsCore.title(doc.text, doc.title) + ' (' + new Date(doc.updated).toLocaleString() + ')', synced: 0 }; copies.push(c); continue; }
+        const doc = fromRow(row);
+        if (doc.id === skip) { incoming = doc; continue; }
         docs.set(doc.id, doc);
         await store.put(doc);
         marks[doc.id] = doc.synced;
         changed = true;
       }
     }
-    for (const c of copies) { docs.set(c.id, c); await store.put(c); upload.push(c); changed = true; }
     keepSynced(marks);
     // the documents that are newer here
     for (const d of upload) {
@@ -120,7 +124,14 @@ const DocsSync = (() => {
       marks[d.id] = d.updated;
       keepSynced(marks);
     }
-    return { docs: [...docs.values()].sort((a, b) => b.updated - a.updated), changed };
+    return { docs: [...docs.values()].sort((a, b) => b.updated - a.updated), changed, incoming };
+  }
+  // the app took the newer version of the open document from the account (run() gave it as incoming)
+  async function take(doc, store) {
+    await store.put(doc);
+    const marks = loadSynced();
+    marks[doc.id] = doc.synced;
+    keepSynced(marks);
   }
 
   // the links: the table scroll_shares (the owner reads, makes and deletes his own) and the function share_get(code) (everybody; the code is the secret)
@@ -148,11 +159,11 @@ const DocsSync = (() => {
   }
 
   return {
-    init, run, shareCode, shareCreate, shareEnd, shareGet,
+    init, run, take, shareCode, shareCreate, shareEnd, shareGet,
     get user() { return user; },
     get service() { return sp; },
-    forget(id) { keepDeleted([...deletedIds(), id]); },
-    unforget(id) { keepDeleted(deletedIds().filter(x => x !== id)); },
+    forget(id, rev) { keepDeleted([...deletedIds().filter(g => g.id !== id), { id, rev: Number.isFinite(rev) ? rev : null }]); },
+    unforget(id) { keepDeleted(deletedIds().filter(g => g.id !== id)); },
     async signOut() { if (sp) await sp.signOut(); user = null; },
   };
 })();
