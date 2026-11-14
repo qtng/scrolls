@@ -6,7 +6,7 @@ Modes (the dropdown in the menu, app.js):
   'telex'   Telex: Vietnamese is typed with Telex in the text; the words stay Latin
   'off'     no Telex: for a keyboard or system method that writes Quốc Ngữ itself
 In both the key bar shows the candidates of the word before the caret: QATT first, PA second, then the Chữ Nôm characters (the first of them marked);
-after QATT characters the variants. Space and Enter take the first Chữ Nôm candidate (Shift+Space, Shift+Enter do not). The QATT and PA cells stay whole: the caret does not stop inside one, Backspace and Delete remove a whole cell,
+after QATT characters the variants. Space takes the first Chữ Nôm candidate (Shift+Space does not); Enter keeps the word as typed and clears the candidates, so that a space after it stays a space. The QATT and PA cells stay whole: the caret does not stop inside one, Backspace and Delete remove a whole cell,
 joiners that join nothing go.
 
   NomInput.plugin            the ProseMirror plugin (editor.js puts it first)
@@ -80,8 +80,14 @@ const NomInput = (() => {
     view.focus();
   };
 
-  // Space and Enter take the preselected candidate (the first Chữ Nôm character of the word before the caret); without one they are as usual,
-  // and so are Shift+Space and Shift+Enter (a plain space or line break after a word that stays Latin)
+  // Space takes the preselected candidate (the first Chữ Nôm character of the word before the caret); without one it is as usual, and so is
+  // Shift+Space (a plain space after a word that stays Latin). Enter clears the candidates of the word (a second Enter is a line break)
+  const dismiss = () => {
+    if (!candidates().length) return false;
+    dismissed = { pos: view.state.selection.from, word: wordBefore().word };
+    if (api.onUpdate) api.onUpdate();
+    return true;
+  };
   const takeFirst = () => {
     const c = candidates().find(k => k.first);
     if (!c) return false;
@@ -98,7 +104,8 @@ const NomInput = (() => {
       handleKeyDown(v, e) {
         shiftDown = e.shiftKey;
         if (e.isComposing || e.ctrlKey || e.metaKey || e.altKey) return false;
-        if (!e.shiftKey && (e.key === ' ' || e.key === 'Enter') && takeFirst()) return true;
+        if (!e.shiftKey && e.key === ' ' && takeFirst()) return true;
+        if (!e.shiftKey && e.key === 'Enter' && dismiss()) return true;   // Enter keeps the word as typed and clears the candidates: a space after it stays a space
         const b = block(v.state);
         if (!b) return false;
         if (e.key !== 'Backspace' && e.key !== 'Delete') return false;
@@ -182,9 +189,11 @@ const NomInput = (() => {
     return { word: view.composing && telexOn() ? VietIme.telex(m[0]) : m[0], from: b.at - m[0].length, at: b.at };
   };
   // QATT first, PA second, then the Chữ Nôm characters (the first of them marked)
+  let dismissed = null;   // { pos, word }: Enter put the word before the caret aside; its candidates stay away until the word or the caret changes
   const candidates = () => {
     const w = wordBefore();
     if (!w) return [];
+    if (dismissed && dismissed.pos === view.state.selection.from && dismissed.word === w.word) return [];
     const out = [];
     for (const sc of ['qatt', 'pa']) { const glyph = inScript(w.word, sc); if (glyph) out.push({ glyph, script: sc, run: () => put(w.from, w.at, glyph) }); }
     VietIme.lookup(w.word).forEach((c, i) => out.push({ ...c, first: i === 0, run: () => put(w.from, w.at, c.glyph) }));
