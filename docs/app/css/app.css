@@ -122,12 +122,9 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .ProseMirror .grp.v .seg { position: relative; left: calc(-1 * var(--seg-shift, 0px)); }
 .ProseMirror .grp.h .seg { position: relative; top: calc(-1 * var(--seg-shift, 0px)); }   /* horizontal: on the middle of the line */   /* on the axis of the column (editor.js measures how far it lies beside it) */
 .ProseMirror .mk { display: inline-block; inline-size: 0; block-size: 1em; }
-/* ruby: the base keeps its cell; the reading sits beside it (horizontal: over / under, vertical: right / left), narrowed along the line by editor.js (--rs) */
+/* ruby: the base keeps its cell; the reading sits beside it (horizontal: over, vertical: right), narrowed along the line by editor.js (--rs) */
 .ProseMirror .rb { position: relative; }
 .ProseMirror .grp p:has(.rb), .ProseMirror .grp h1:has(.rb), .ProseMirror .grp h2:has(.rb) { line-height: 2.2; }
-/* a reading on the other side too (under: left in vertical text): the column needs room for it, else it meets the reading of the column next to it (the
-   reading is .54 wide and stands .22 off the character: one side 2.2 em, both sides about 2.6 em of a column; a neighbour of 2.2 counts half of it) */
-.ProseMirror .grp p:has(.rb[data-side="under"]), .ProseMirror .grp h1:has(.rb[data-side="under"]), .ProseMirror .grp h2:has(.rb[data-side="under"]) { line-height: 2.7; }
 /* the box of a character differs with the font (--rt-a, --rt-d, --rt-bw: its content area in em, measured by editor.js; the reference is QATT Pen: 1.16 above,
    .288 below the baseline, 1.448 wide), the ink in it does not move as much: the reading and the line are set back by what the box lacks (the factors from
    measuring the fonts); --bem is the size of the base in px, whatever the size of the reading */
@@ -136,10 +133,8 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .ProseMirror .rb .rt { position: absolute; font-size: .54em; line-height: 1; white-space: nowrap; pointer-events: none; user-select: none; opacity: .85; text-orientation: mixed; }
 .ProseMirror .grp.h .rb .rt { left: 50%; transform: translateX(-50%) scaleX(var(--rs, 1)); }
 .ProseMirror .grp.h .rb[data-side="over"] .rt { bottom: calc(100% + (1.16 - var(--rt-a, 1.16)) * .5 * var(--bem)); }
-.ProseMirror .grp.h .rb[data-side="under"] .rt { top: calc(100% + (.288 - var(--rt-d, .288)) * .5 * var(--bem)); }
 .ProseMirror .grp.v .rb .rt { top: 50%; transform: translateY(-50%) scaleY(var(--rs, 1)); }
-.ProseMirror .grp.v .rb[data-side="over"] .rt { left: calc(100% + (1.448 - var(--rt-bw, 1.448)) * .28 * var(--bem)); }
-.ProseMirror .grp.v .rb[data-side="under"] .rt { right: calc(100% + (1.448 - var(--rt-bw, 1.448)) * .28 * var(--bem)); }
+.ProseMirror .grp.v .rb[data-side="over"] .rt { left: calc(100% + (1.448 - var(--rt-bw, 1.448)) * .28 * var(--bem) - .14 * var(--bem)); }
 /* a reading of single cells: spread over the whole base, each cell in an equal share (editor.js sets the size) */
 .ProseMirror .grp .rb .rt.cells { display: flex; justify-content: center; align-items: center; transform: none; }
 .ProseMirror .rb .rt.cells > span { flex: none; inline-size: 1em; display: flex; justify-content: center; }
