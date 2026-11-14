@@ -909,7 +909,7 @@ const RubyBox = {
         this.kindGroup = el('div', { className: 'rt-radios', role: 'radiogroup' }, ...this.kindBtns);
         const head = (en, vi) => el('div', { className: 'rt-head', textContent: en, 'data-vi': vi });
         this.box = el('div', { className: 'scroll-ui ruby-box bg-light', hidden: true },
-            el('div', { className: 'rt-row rt-title' }, el('span', { className: 'rt-name', textContent: 'Annotation', 'data-vi': 'Chú thích' }), this.ok, this.del),
+            el('div', { className: 'rt-row rt-title' }, el('span', { className: 'rt-name', textContent: 'Annotation', 'data-vi': 'Chú thích' }), this.del, this.ok),
             el('div', { className: 'rt-row rt-headrow' }, head('Reading', 'Cách đọc'), this.eachBtn),
             el('div', { className: 'rt-row rt-group' }, this.shown, this.input, this.kindGroup),
             el('div', { className: 'rt-sep' }),
