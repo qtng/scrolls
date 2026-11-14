@@ -193,7 +193,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .keybar.symbols .variants, .keybar.symbols .nom-more { display: none !important; }
 .symbolbar button { min-width: 0; padding: 0; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); font-family: var(--doc-font), var(--nom), serif; font-size: 1.5rem; line-height: 1; }
 .symbolbar button:active { background: rgba(255, 255, 255, .12); }
-.sym-icon { font-family: var(--doc-font), var(--nom), serif; font-size: 1.15rem; }
+.sym-icon { font-family: var(--doc-font), var(--nom), serif; font-size: 1rem; letter-spacing: -.1em; }
 .variant.nom, .nom-more button { font-family: var(--doc-font), var(--nom), serif; }
 /* PA (slot 2): tinted, QATT (slot 1) plain; the first Chữ Nôm candidate (the one a space will take) is filled in the accent colour */
 .variant.pa { background: color-mix(in srgb, var(--accent) 26%, var(--bg)); border-color: color-mix(in srgb, #f0932b 50%, transparent); }   /* a pale orange edge */

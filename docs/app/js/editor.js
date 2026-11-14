@@ -741,7 +741,7 @@ const UI = {
         this.bWari.classList.add('txt');
         this.bRuby = btn(el('i', { className: 'fa-solid fa-message' }), 'Annotation (reading, marks, punctuation)', 'Chú thích (cách đọc, dấu, dấu câu)', () => RubyBox.open());
         // special characters: the button opens or closes the bar of special characters (app.js, event nomsymbols)
-        this.bSym = btn(el('span', { className: 'sym-icon', textContent: '※' }), 'Special characters', 'Ký tự đặc biệt', () => document.dispatchEvent(new CustomEvent('nomsymbols')));
+        this.bSym = btn(el('span', { className: 'sym-icon', textContent: '「」' }), 'Special characters', 'Ký tự đặc biệt', () => document.dispatchEvent(new CustomEvent('nomsymbols')));
         this.bSym.classList.add('sym-btn');
         // the settings of the paragraphs are drop-downs; the group label of the list says what the option is
         const select = (label, labelVi, options, change) => {
