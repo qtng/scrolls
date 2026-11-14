@@ -187,6 +187,13 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .variant:disabled, .more:disabled { opacity: .35; }
 .variant:not(:disabled):active, .more:not(:disabled):active, .nom-more button:active { background: rgba(255, 255, 255, .12); }
 .more[aria-expanded="true"] { color: var(--accent); border-color: var(--accent); }
+/* special characters: the bar replaces the candidates while it is open, two rows scrolling sideways */
+.symbolbar { display: none; flex: 1; min-width: 0; grid-template-rows: repeat(2, 44px); grid-auto-flow: column; grid-auto-columns: 40px; gap: .25rem; overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: none; }
+.keybar.symbols .symbolbar { display: grid; }
+.keybar.symbols .variants, .keybar.symbols .nom-more { display: none !important; }
+.symbolbar button { min-width: 0; padding: 0; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); font-family: var(--doc-font), var(--nom), serif; font-size: 1.5rem; line-height: 1; }
+.symbolbar button:active { background: rgba(255, 255, 255, .12); }
+.sym-icon { font-family: var(--doc-font), var(--nom), serif; font-size: 1rem; letter-spacing: -.1em; }
 .variant.nom, .nom-more button { font-family: var(--doc-font), var(--nom), serif; }
 /* PA (slot 2): tinted, QATT (slot 1) plain; the first Chữ Nôm candidate (the one a space will take) is filled in the accent colour */
 .variant.pa { background: color-mix(in srgb, var(--accent) 26%, var(--bg)); border-color: color-mix(in srgb, #f0932b 50%, transparent); }   /* a pale orange edge */

@@ -740,6 +740,9 @@ const UI = {
         this.bWari = btn(vi('Split', 'Chia'), 'Two-column text', 'Chữ hai dòng', cmd(toggleWari));
         this.bWari.classList.add('txt');
         this.bRuby = btn(el('i', { className: 'fa-solid fa-message' }), 'Annotation (reading, marks, punctuation)', 'Chú thích (cách đọc, dấu, dấu câu)', () => RubyBox.open());
+        // special characters: the button opens or closes the bar of ideographic brackets and punctuation (app.js, event nomsymbols)
+        this.bSym = btn(el('span', { className: 'sym-icon', textContent: '「」' }), 'Special characters (CJK brackets and punctuation)', 'Ký tự đặc biệt (ngoặc và dấu câu CJK)', () => document.dispatchEvent(new CustomEvent('nomsymbols')));
+        this.bSym.classList.add('sym-btn');
         // the settings of the paragraphs are drop-downs; the group label of the list says what the option is
         const select = (label, labelVi, options, change) => {
             const sel = el('select', { className: 'form-select form-select-sm' });
@@ -757,7 +760,7 @@ const UI = {
         this.selCols = select('Characters per column', 'Số chữ mỗi cột', COLS_OPTIONS.map(n => [String(n), String(n)]), v => this.setSettings({ cols: clampCols(+v) }));
         const colsRow = el('label', { className: 'menu-row' }, vi('Characters per column', 'Số chữ mỗi cột'), this.selCols);
         this.bPage = btn(icon('fa-file-circle-plus'), 'New page (Ctrl+Enter)', 'Trang mới (Ctrl+Enter)', cmd(pageBreak));
-        this.bar.append(this.bH1, this.bH2, this.bWari, this.bRuby);
+        this.bar.append(this.bH1, this.bH2, this.bWari, this.bRuby, this.bSym);
         parts.dir.append(this.bDir);
         parts.menu.append(colsRow);
         (parts.newPage || parts.menu).append(this.bPage);
@@ -1029,7 +1032,7 @@ const imeKeys = new Plugin({
 // NomEditor.mount(element, parts, extra)   once: the view in `element`, the buttons in parts (UI.init), more plugins first (the input)
 // NomEditor.open(content, onChange)   a document (its JSON, or null for a new one); onChange() after every change of the document
 // NomEditor.json(), .text()           the document as JSON, its text (blocks on lines of their own)
-// NomEditor.setEditable(on), .editable, .focus(), .undo(), .redo(), .canUndo(), .canRedo(), .setTelex(on), .relayout()
+// NomEditor.setEditable(on), .editable, .focus(), .insert(text), .undo(), .redo(), .canUndo(), .canRedo(), .setTelex(on), .relayout()
 let view = null, changed = null, editable = false;
 const NomEditor = {
     schema, upgrade, emptyDoc,
@@ -1086,6 +1089,7 @@ const NomEditor = {
     get editable() { return editable; },
     setEditable(on) { editable = !!on; view.setProps({}); if (!on) RubyBox.close(false); UI.refresh(); },
     focus() { view.focus(); },
+    insert(text) { view.dispatch(view.state.tr.insertText(text).scrollIntoView()); view.focus(); },   // at the caret (replaces the selection)
     undo() { undo(view.state, view.dispatch); },
     redo() { redo(view.state, view.dispatch); },
     canUndo: () => undo(view.state),

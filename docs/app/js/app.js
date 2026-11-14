@@ -317,7 +317,11 @@ window.notesApp = { store, ready, flush() } is for the tests.
   }
   function renderKeys() {
     keybar.hidden = !NomEditor.editable || !state.current;
-    if (keybar.hidden) { showMore(false); return; }
+    if (keybar.hidden) { showMore(false); if (symOpen) showSymbols(false); return; }
+    if (symOpen) {   // any change of the text or the caret closes the bar of special characters
+      const st = NomEditor.view.state;
+      if (st.doc !== symOpen.doc || st.selection.from !== symOpen.pos) showSymbols(false);
+    }
     fitSlots();
     const list = NomInput.candidates();
     shown = list.length ? list.slice(0, slots) : [];
@@ -339,6 +343,28 @@ window.notesApp = { store, ready, flush() } is for the tests.
     moreBtn.disabled = !rest.length;
     showMore(false);
   }
+  // ----- special characters: the bar of ideographic brackets and CJK punctuation; the button next to the annotation button opens and closes it, and
+  // it closes by itself as soon as the text or the caret changes (also after a character was put in) -----
+  const symbolbar = $('symbolbar'), SYMBOLS = [
+    ...'「」『』【】〔〕〈〉《》（）［］｛｝〖〗〘〙', ...'、。，．；：？！…‥・〜ー〃々〇※〆〒◎'];
+  let symOpen = null;   // { doc, pos } of the editor when the bar was opened
+  function showSymbols(on) {
+    const was = !!symOpen;
+    symOpen = on ? { doc: NomEditor.view.state.doc, pos: NomEditor.view.state.selection.from } : null;
+    keybar.classList.toggle('symbols', on);
+    const b = document.querySelector('.sym-btn');
+    if (b) b.classList.toggle('on', on);
+    if (on) symbolbar.scrollLeft = 0;
+    if (was !== on) shownKeys = null;
+  }
+  symbolbar.append(...SYMBOLS.map(ch => {
+    const btn = document.createElement('button');
+    btn.type = 'button'; btn.textContent = ch;
+    btn.addEventListener('pointerdown', e => e.preventDefault());
+    btn.addEventListener('click', () => NomEditor.insert(ch));
+    return btn;
+  }));
+  document.addEventListener('nomsymbols', () => showSymbols(!symOpen));
   const keepFocus = e => e.preventDefault();   // a click on the bar does not take the focus (and the keyboard) from the text
   slotBtns.forEach((btn, i) => { btn.addEventListener('pointerdown', keepFocus); btn.addEventListener('click', () => { const v = shown[i]; if (v) v.run(); }); });
   moreBtn.addEventListener('pointerdown', keepFocus);
