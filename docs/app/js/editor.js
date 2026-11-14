@@ -539,15 +539,20 @@ class Layout {
             const bands = Math.max(1, Math.floor((bottom - top - 1) / inf.pitch) + 1);
             sec.style.height = ((bands * inf.pitch - inf.gap + inf.pad.t + inf.pad.b) / inf.em).toFixed(4) + 'em';
         }
-        // ruby: a reading of single cells (Chữ Nôm, PA, QATT) is spread evenly over its base, each cell in its share of the base (two cells on one
-        // character at a quarter and three quarters), smaller when they do not fit (each at most its share: 0.5 of the base for two); a Latin reading (Quốc Ngữ) longer than its base is narrowed
+        // ruby: a reading of single cells (Chữ Nôm, PA, QATT) is set over its base, each cell 0.54 of the base (smaller only from three cells a
+        // character). When they fit, each sits in the middle of its share; when not, the cells of one ruby move together (they overlap) and the
+        // outer ones end at the ends of the base, so that the readings of neighbouring characters do not overlap. A Latin reading (Quốc Ngữ)
+        // longer than its base is narrowed
         for (const rb of view.dom.querySelectorAll('.rb')) {
             const base = rb.firstElementChild, rt = rb.lastElementChild;
             if (!base || !rt || !rt.textContent) continue;
             if (rt.classList.contains('cells')) {
-                const share = cellsOf(base.textContent).length / Math.max(1, rt.children.length);
-                const size = Math.min(0.55, share).toFixed(3) + 'em';
+                const len = cellsOf(base.textContent).length, n = Math.max(1, rt.children.length), share = len / n;
+                const f = Math.min(0.54, 1.08 * share);   // in em of the base
+                const gap = n * f <= len ? share - f : (len - n * f) / Math.max(1, n - 1);   // between two cells, in em of the base
+                const size = f.toFixed(3) + 'em', g = (gap / f).toFixed(3) + 'em';   // the gap in em of the reading
                 if (rt.style.fontSize !== size) rt.style.fontSize = size;
+                if (rt.style.getPropertyValue('--rg') !== g) rt.style.setProperty('--rg', g);
                 continue;
             }
             const v = !!rb.closest('.grp.v'), r = base.getBoundingClientRect();
