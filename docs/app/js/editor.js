@@ -627,11 +627,13 @@ function annotToRuby(fragment) {
     return Fragment.fromArray(out);
 }
 
-// the ruby mark at a position (the character after it, else the one before) and the range it covers in its block
-function rubyAt(state, pos) {
+// the ruby mark at a position and the range it covers in its block: the caret means the character before it (as for a new ruby), the one after
+// only at the start of a block; a selection (forward) means the character after its start
+function rubyAt(state, pos, forward = false) {
     const $pos = state.doc.resolve(pos), type = schema.marks.ruby;
     const after = $pos.nodeAfter, before = $pos.nodeBefore;
-    const mark = (after && type.isInSet(after.marks)) || (before && type.isInSet(before.marks));
+    const of = n => n && type.isInSet(n.marks);
+    const mark = forward ? of(after) : before ? of(before) : of(after);
     if (!mark) return null;
     const start = $pos.start();
     let found = null, cur = null;
@@ -835,7 +837,7 @@ const RubyBox = {
         let range;
         if (sel.empty) range = rubyAt(state, sel.from) || cellBefore(state, sel.from);
         else if (sel.$from.parent === sel.$to.parent && !state.doc.rangeHasMark(sel.from, sel.to, schema.marks.warichu)) {
-            const r = rubyAt(state, sel.from);   // a selection inside one ruby edits it
+            const r = rubyAt(state, sel.from, true);   // a selection inside one ruby edits it
             range = { from: sel.from, to: sel.to, mark: r && r.from <= sel.from && sel.to <= r.to ? r.mark : null };
         }
         if (range && !range.mark) {   // a new ruby: not on the spaces at the ends of the selection (a ruby on a space alone is squeezed into its width)
