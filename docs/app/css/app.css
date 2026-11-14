@@ -150,8 +150,8 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .ProseMirror .grp.v .rb[data-deco="line"] > .rb-b { text-underline-position: right; text-underline-offset: calc(.06em + (1.448 - var(--rt-bw, 1.448)) * .19em); }
 .ProseMirror .grp.h .rb[data-deco="line"] > .rb-b { text-underline-position: auto; text-underline-offset: var(--line-h, -1.02em); }
 /* a circle, dot or sesame dot beside every character (a passage stressed): on the right (horizontal: over), on the other side when a reading is there */
-.ProseMirror .rb[data-deco="circle"] > .rb-b { text-emphasis-style: open circle; }
-.ProseMirror .rb[data-deco="dot"] > .rb-b { text-emphasis-style: filled circle; }
+.ProseMirror .rb[data-deco="circle"] > .rb-b { text-emphasis-style: '\25CB'; }
+.ProseMirror .rb[data-deco="dot"] > .rb-b { text-emphasis-style: '\25CF'; }
 .ProseMirror .rb[data-deco="sesame"] > .rb-b { text-emphasis-style: '\FE45'; }
 .ProseMirror .rb[data-deco="sesame-open"] > .rb-b { text-emphasis-style: '\FE46'; }
 .ProseMirror .rb[data-deco]:not([data-deco^="rd"]) > .rb-b { text-emphasis-color: var(--mark-ink); text-emphasis-position: over right; }
