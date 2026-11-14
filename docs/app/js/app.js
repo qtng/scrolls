@@ -384,7 +384,7 @@ window.notesApp = { store, ready, flush() } is for the tests.
   document.addEventListener('focusout', () => setTimeout(fitKeyboard, 350));
 
   // ----- menus -----
-  const MENUS = [['menu-btn', 'menu'], ['list-menu-btn', 'list-menu'], ['style-btn', 'style-menu'], ['size-btn', 'size-menu'], ['share-btn', 'share-menu']];
+  const MENUS = [['menu-btn', 'menu'], ['list-menu-btn', 'list-menu'], ['style-btn', 'style-menu'], ['share-btn', 'share-menu']];
   function closeMenu() { for (const [button, menu] of MENUS) { $(menu).hidden = true; $(button).setAttribute('aria-expanded', 'false'); } }
   for (const [button, menu] of MENUS) $(button).addEventListener('click', e => {
     e.stopPropagation();
@@ -394,7 +394,6 @@ window.notesApp = { store, ready, flush() } is for the tests.
     $(button).setAttribute('aria-expanded', String(open));
   });
   document.addEventListener('click', e => { if (!e.target.closest('.menu')) closeMenu(); });
-  $('size-btn').addEventListener('pointerdown', e => e.preventDefault());   // the keyboard stays
   document.addEventListener('keydown', e => { if (e.key === 'Escape') closeMenu(); });
 
   // ----- search, export, import -----
@@ -441,7 +440,7 @@ window.notesApp = { store, ready, flush() } is for the tests.
 
   // ----- font, style, size, table: they belong to the document (doc.format: only what differs from the defaults) -----
   const FONTS = qattFontsShown();   // js/fonts.js decides which fonts this visitor has; its default is the default here
-  const FORMAT_DEFAULTS = { font: (FONTS.find(f => f.default) || FONTS[0]).family, fontSize: 100, decoding: 'qatt' };
+  const FORMAT_DEFAULTS = { font: (FONTS.find(f => f.default) || FONTS[0]).family, textSize: 24, decoding: 'qatt' };
   const formatOf = doc => ({ ...FORMAT_DEFAULTS, ...(doc && doc.format && typeof doc.format === 'object' ? doc.format : {}) });
   const keepFormat = (key, value) => { const doc = state.current; if (!doc || state.shared) return; doc.format = { ...(doc.format || {}), [key]: value }; if (value === FORMAT_DEFAULTS[key]) delete doc.format[key]; schedule(); };
   // the font with its Latin, the PA behind it, then the Chữ Nôm fonts of the Chunom site (js/fonts.js)
@@ -504,33 +503,38 @@ window.notesApp = { store, ready, flush() } is for the tests.
   const MAX_CHARS = 23;
   const pageWidth = () => Math.min(MAX_CHARS, Math.round(room() / BASE * 10) / 10);   // in characters of 32 px, at most 23
   // Two sizes: the zoom (reading only, the slider of the title bar, not kept) scales the page and its text together; the font size of the
-  // document (editing, format.fontSize in %, kept and synced) scales only the text in its page of fixed width, so that more or less fits on a page.
-  // The unit (--unit) is the size of a character of 100%: the page is format.width units wide, the text is fontSize % of a unit. (Later a size of
+  // document (editing, format.textSize: 14 … 144 px, 24 by default; kept and synced) scales only the text in its page of
+  // fixed width, so that more or less fits on a page. The unit (--unit) is 32 px at 100 % (more on a wide screen), the page is format.width units
+  // wide, the text is textSize / 32 of a unit, i.e. textSize px. (Later a size of
   // a paragraph or a character can be relative to the text of the document, in em.)
   let zoom = 100;
   function applySize(relayout = true) {   // a zoom alone needs no new layout: the layout is in em
     const doc = state.current, w = doc && doc.format && doc.format.width > 0 ? doc.format.width : pageWidth();
     // the document fills the width of the screen: smaller where it does not fit, larger where there is room, but at most twice its size
-    const fit = Math.min(2, room() / (w * BASE)), unit = BASE * fit * zoom / 100, scale = formatOf(doc).fontSize / 100;
+    const fit = Math.min(2, room() / (w * BASE)), unit = BASE * fit * zoom / 100, scale = textSizeOf(doc) / BASE;
     document.documentElement.style.setProperty('--page-em', String(w));
     document.documentElement.style.setProperty('--unit', unit.toFixed(2) + 'px');
     document.documentElement.style.setProperty('--doc-size', (unit * scale).toFixed(2) + 'px');
     if (relayout) NomEditor.relayout();
   }
   const step25 = (v, lo, hi) => Math.min(hi, Math.max(lo, Math.round((Number(v) || 100) / 25) * 25));
-  // the zoom: the middle of what is seen stays where it is (a page wider than the screen scrolls sideways); a vertical page begins at its right edge
   // the zoom: the point of the document under `at` (client coordinates; default the middle of the field) stays where it is; on opening a vertical
   // page begins at its right edge (a page wider than the screen scrolls sideways)
   const setZoom = (value, user, at) => {
     zoom = Math.min(300, Math.max(50, Number(value) || 100));   // continuous (the font size moves in steps)
     $('read-zoom').value = zoom;
-    const f = $('field'), r = f.getBoundingClientRect();
-    const ax = at ? at.x - r.left : f.clientWidth / 2, ay = at ? at.y - r.top : f.clientHeight / 2;
-    const rx = (f.scrollLeft + ax) / Math.max(1, f.scrollWidth), ry = (f.scrollTop + ay) / Math.max(1, f.scrollHeight);
+    const f = $('field'), fr = f.getBoundingClientRect(), ed = $('editor');
+    const p0 = at || { x: fr.left + f.clientWidth / 2, y: fr.top + f.clientHeight / 2 };
+    const unitNow = () => parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--unit')) || BASE;
+    const r0 = ed.getBoundingClientRect(), u0 = unitNow();
+    const ux = (p0.x - r0.left) / u0, uy = (p0.y - r0.top) / u0;   // the point in units of the pages
     applySize(false);
     const place = () => {
-      if (user) { f.scrollLeft = rx * f.scrollWidth - ax; f.scrollTop = ry * f.scrollHeight - ay; }
-      else if (f.querySelector('.grp.v')) f.scrollLeft = f.scrollWidth;
+      if (user) {   // the same point of the pages under p0 again
+        const r1 = ed.getBoundingClientRect(), u1 = unitNow();
+        f.scrollLeft += r1.left + ux * u1 - p0.x;
+        f.scrollTop += r1.top + uy * u1 - p0.y;
+      } else if (f.querySelector('.grp.v')) f.scrollLeft = f.scrollWidth;
     };
     place();   // at once (the new sizes are laid out when they are read), and again when the layout of the pages is done
     requestAnimationFrame(() => requestAnimationFrame(place));
@@ -545,23 +549,24 @@ window.notesApp = { store, ready, flush() } is for the tests.
     const mid = t => ({ x: (t[0].clientX + t[1].clientX) / 2, y: (t[0].clientY + t[1].clientY) / 2 });
     // while the fingers move the title and the pages are only scaled (a transform: no layout, nothing moves); at the end the zoom is set once
     const parts = () => [field.querySelector('.doc-head'), $('editor')];
-    const scaleBy = (s, at) => parts().forEach(el => {
-      if (s === 1) { el.style.transform = ''; el.style.transformOrigin = ''; return; }
+    // the origin of each part is set once at the start of a gesture, from its place unscaled (a box measured while scaled would move the origin)
+    const origin = at => parts().forEach(el => {
+      el.style.transform = ''; el.style.willChange = 'transform';
       const r = el.getBoundingClientRect();
       el.style.transformOrigin = `${at.x - r.left}px ${at.y - r.top}px`;
-      el.style.transform = `scale(${s})`;
     });
+    const scaleBy = s => parts().forEach(el => { el.style.transform = s === 1 ? '' : `scale(${s})`; });
     field.addEventListener('touchstart', e => {
       if (e.touches.length !== 2 || !reading()) return;
       pinch = { d: spread(e.touches), z: zoom, at: mid(e.touches), s: 1 };
-      parts().forEach(el => { el.style.willChange = 'transform'; });
+      origin(pinch.at);
     }, { passive: true });
     field.addEventListener('touchmove', e => {
       if (!pinch || e.touches.length !== 2) return;
       e.preventDefault();
       const z = Math.min(300, Math.max(50, pinch.z * spread(e.touches) / pinch.d));
       pinch.s = z / pinch.z;
-      if (!frame) frame = requestAnimationFrame(() => { frame = 0; if (pinch) scaleBy(pinch.s, pinch.at); });
+      if (!frame) frame = requestAnimationFrame(() => { frame = 0; if (pinch) scaleBy(pinch.s); });
     }, { passive: false });
     const endPinch = () => {
       if (!pinch) return;
@@ -576,9 +581,9 @@ window.notesApp = { store, ready, flush() } is for the tests.
     const slider = $('read-zoom'), centre = () => { const r = field.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; };
     let drag = null;
     slider.addEventListener('input', () => {
-      if (!drag) { drag = { z: zoom, at: centre() }; parts().forEach(el => { el.style.willChange = 'transform'; }); }
+      if (!drag) { drag = { z: zoom, at: centre() }; origin(drag.at); }
       const s = Math.min(300, Math.max(50, +slider.value)) / drag.z;
-      if (!frame) frame = requestAnimationFrame(() => { frame = 0; if (drag) scaleBy(s, drag.at); });
+      if (!frame) frame = requestAnimationFrame(() => { frame = 0; if (drag) scaleBy(s); });
     });
     slider.addEventListener('change', () => {
       const d = drag; drag = null;
@@ -593,14 +598,19 @@ window.notesApp = { store, ready, flush() } is for the tests.
       later((next && frame ? next.value : zoom) * Math.exp(-e.deltaY * 0.01), { x: e.clientX, y: e.clientY });
     }, { passive: false });
   }
-  // the font size of the document
+  // the font size of the document: one of the sizes of the list, in px (24 by default)
+  const TEXT_SIZES = [14, 16, 18, 20, 24, 28, 32, 36, 48, 72, 96, 144];
+  function textSizeOf(doc) {
+    const f = doc && doc.format || {};
+    return TEXT_SIZES.includes(f.textSize) ? f.textSize : 24;
+  }
   const setFontSize = (value, user) => {
-    const v = step25(value, 25, 400);
-    $('set-size').value = v; $('size-label').textContent = $('size-btn-label').textContent = v + '%';
-    if (user) keepFormat('fontSize', v);
+    const n = Number(value), v = TEXT_SIZES.includes(n) ? n : 24;
+    $('set-size').value = String(v);
+    if (user) keepFormat('textSize', v);
     applySize();
   };
-  $('set-size').addEventListener('input', () => setFontSize($('set-size').value, true));
+  $('set-size').addEventListener('change', () => { setFontSize($('set-size').value, true); NomEditor.focus(); });
   window.addEventListener('resize', () => { if (state.current) applySize(); });
   // a document without a width (a new one, or one of before): the width of this screen, kept in the document (not for a shared one)
   function fixWidth(doc) {
@@ -625,7 +635,7 @@ window.notesApp = { store, ready, flush() } is for the tests.
   function applyFormat(doc) {
     const f = formatOf(doc);
     fixWidth(doc);
-    setFont(f.font); setFontSize(f.fontSize); setZoom(100); useDecoding(f.decoding);
+    setFont(f.font); setFontSize(textSizeOf(doc)); setZoom(100); useDecoding(f.decoding);
   }
 
   // ----- delete and undo -----

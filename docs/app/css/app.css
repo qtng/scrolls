@@ -75,7 +75,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .fmtbar .pop.end .menu { left: auto; right: 0; }
 #size-menu .menu-row { width: 260px; padding: 0 .4rem; }
 .fmtbar .ime-select { flex: none; min-height: 40px; max-width: 7.5rem; padding: 0 .25rem; border: 1px solid var(--line); border-radius: 8px; background: transparent; color: inherit; font-size: .8rem; }
-.fmtbar .ime-select option { color: var(--ink); background: var(--bg); }
+.fmtbar .ime-select option, .fmtbar .ime-select optgroup { color: var(--ink); background: var(--bg); }
 /* the buttons of the editor (editor.js puts them into #toolbar) */
 .tools { flex: 1 1 auto; min-width: 0; display: flex; align-items: center; gap: 2px; overflow-x: auto; scrollbar-width: none; }
 .tools::-webkit-scrollbar { display: none; }
@@ -102,6 +102,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .ProseMirror .sec { position: relative; margin: 0 0 2rem; padding: .5em 0; border-radius: 4px; background: var(--field-bg, #efe6cf); color: var(--field-ink, #1b1814); text-shadow: var(--field-shadow, none);
   caret-color: var(--field-ink, #1b1814); box-shadow: 0 .5rem 1.5rem rgba(0, 0, 0, .45); }
 .ProseMirror .grp { position: relative; }
+.ProseMirror .sec:last-child > .grp:last-child { padding-bottom: .5em; border-bottom: 1px dotted color-mix(in srgb, currentColor 35%, transparent); }   /* the end of the document */
 .ProseMirror .grp + .grp { margin-top: .5em; padding-top: .5em; border-top: 1px dotted color-mix(in srgb, currentColor 35%, transparent); }   /* the next page */
 .ProseMirror p, .ProseMirror h1, .ProseMirror h2 { margin: 0; font-weight: normal; font-family: inherit; }
 .ProseMirror h1 { font-size: 1.6em; }
@@ -120,7 +121,6 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .ProseMirror .grp.v .seg { position: relative; left: calc(-1 * var(--seg-shift, 0px)); }
 .ProseMirror .grp.h .seg { position: relative; top: calc(-1 * var(--seg-shift, 0px)); }   /* horizontal: on the middle of the line */   /* on the axis of the column (editor.js measures how far it lies beside it) */
 .ProseMirror .mk { display: inline-block; inline-size: 0; block-size: 1em; }
-.ProseMirror .is-empty::before { content: attr(data-placeholder); position: absolute; opacity: .5; pointer-events: none; }
 /* ruby: the base keeps its cell; the reading sits beside it (horizontal: over / under, vertical: right / left), narrowed along the line by editor.js (--rs) */
 .ProseMirror .rb { position: relative; }
 .ProseMirror .grp p:has(.rb), .ProseMirror .grp h1:has(.rb), .ProseMirror .grp h2:has(.rb) { line-height: 2.2; }
@@ -221,6 +221,7 @@ input.doc-title:focus { border-color: var(--accent); }
 .size-btn[aria-expanded="true"] { color: var(--accent); border-color: var(--accent); }
 .fmtbar .page-tools button { width: 40px; height: 40px; }
 .fmtbar .ime-select { max-width: 6.5rem; }
+.fmtbar .size-select { flex: none; width: auto; }
 
 /* shared (somebody else's link): reading only; the owner shares and ends the link from the bar */
 #view-editor.shared #edit-btn, #view-editor.shared #share-btn { display: none; }

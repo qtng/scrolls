@@ -347,6 +347,10 @@ const measure = {
     },
 };
 
+// the cells of a text: a QATT or PA cell (several code points the font draws as one) is one, else every code point (input.js knows the cells).
+// The two-column text is measured cell by cell: a part of a cell measured alone is as wide as a whole character, which put all the cells in the first line.
+const cellsOf = text => (typeof NomInput !== 'undefined' && NomInput.cells ? NomInput.cells(text) : [...text]);
+
 // The segments of a run of two-column text (chars: code points, widths: their advances in px). The grid of the old prints: a segment takes
 // whole cells; the first one fills the rest of the column, the next ones whole columns, the last one is balanced (the first line is the
 // longer one); what is left of its last cell stays empty. from/to are offsets in UTF-16 units from the start of the run.
@@ -503,20 +507,21 @@ class Layout {
                 const mk = mks[k], sec = mk.closest('div.grp'), inf = info.get(sec);
                 if (!inf) return;
                 const pcs = getComputedStyle(mk.parentElement), half = parseFloat(pcs.fontSize) / 2;   // a character of the two-column text
-                const chars = [...run.text];
+                const chars = cellsOf(run.text);   // QATT and PA cells whole (several code points, one cell of the font)
                 const box = sec.getBoundingClientRect(), r = mk.getBoundingClientRect();
                 let offset = inf.v ? (r.top - box.top - inf.pad.t) % inf.pitch : (r.left - box.left - inf.pad.l);
                 if (offset < 0) offset = 0;
                 for (const s of segments(chars, measure.widths(chars, pcs, half, inf.v), offset, inf.len, half)) {
                     const from = run.from + s.from, to = run.from + s.to;
                     decos.push(Decoration.inline(from, to, { class: 'seg', style: s.style }, { style: s.style }));
-                    sig.push(`${from}:${to}:${s.style}`);
+                    sig.push([from, to, s.style]);
                 }
             });
         }
         // compared with the segments in place (mapped through the edits since; a replaced block has lost its own)
-        const have = layoutKey.getState(view.state).find().sort((a, b) => a.from - b.from).map(d => `${d.from}:${d.to}:${d.spec.style}`).join('|');
-        if (sig.join('|') !== have && this.passes < 40) {
+        const key = list => list.sort((a, b) => a[0] - b[0] || a[1] - b[1] || (a[2] < b[2] ? -1 : a[2] > b[2] ? 1 : 0)).map(x => x.join(':')).join('|');
+        const have = key(layoutKey.getState(view.state).find().map(d => [d.from, d.to, d.spec.style]));
+        if (key(sig) !== have && this.passes < 40) {
             this.passes++;
             view.dispatch(view.state.tr.setMeta(layoutKey, DecorationSet.create(view.state.doc, decos)).setMeta('addToHistory', false));
             return;   // the update schedules the next pass: a run moves when the runs before it have changed
@@ -624,18 +629,6 @@ function rubyAt(state, pos) {
     });
     return found;
 }
-
-// ---------------------------------------------------------------- placeholder
-const placeholderPlugin = new Plugin({
-    props: {
-        decorations(state) {
-            const doc = state.doc;
-            const sec = doc.firstChild, grp = sec && sec.firstChild, para = grp && grp.firstChild;
-            if (doc.childCount !== 1 || sec.childCount !== 1 || grp.type !== S.group || grp.childCount !== 1 || para.content.size) return null;
-            return DecorationSet.create(doc, [Decoration.node(2, 2 + para.nodeSize, { class: 'is-empty', 'data-placeholder': T('Write…', 'Viết…') })]);
-        },
-    },
-});
 
 // ---------------------------------------------------------------- the toolbar (the format bar of the app)
 const UI = {
@@ -936,7 +929,6 @@ const NomEditor = {
             history(),
             dropCursor(),
             normalizePlugin,
-            placeholderPlugin,
             layoutPlugin,
             uiPlugin,
             wariPlugin,
