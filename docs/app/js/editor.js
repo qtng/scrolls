@@ -703,6 +703,8 @@ const rubyDelete = new Plugin({
 });
 
 // the visible cell (a character, a QATT or PA cell) just before the caret, not in two-column text: the base of a new ruby
+// text that can take an annotation: it has something that is no space, punctuation, Latin letter (Quốc Ngữ) or accent
+const ANNOTATABLE = /[^\s\p{P}\p{Script=Latin}\p{M}]/u;
 function cellBefore(state, pos) {
     const $pos = state.doc.resolve(pos), start = $pos.start();
     if (!$pos.parent.inlineContent || pos <= start) return null;
@@ -710,7 +712,7 @@ function cellBefore(state, pos) {
     if (!before || !before.isText || schema.marks.warichu.isInSet(before.marks)) return null;
     const cells = cellsOf(state.doc.textBetween(Math.max(start, pos - 16), pos));
     const last = cells[cells.length - 1];
-    if (!last || !/[^\s\p{P}]/u.test(last)) return null;
+    if (!last || !ANNOTATABLE.test(last)) return null;
     return { from: pos - last.length, to: pos, mark: null };
 }
 
@@ -778,7 +780,7 @@ const UI = {
         on(this.bWari, sel.empty ? (ws ? ws.on : !!wari.isInSet(state.storedMarks || $f.marks())) : state.doc.rangeHasMark(sel.from, sel.to, wari));
         const inRuby = sel.empty && rubyAt(state, sel.from);
         on(this.bRuby, inRuby || (!sel.empty && state.doc.rangeHasMark(sel.from, sel.to, ruby)));
-        this.bRuby.disabled = !(inRuby || (sel.empty && cellBefore(state, sel.from)) || (!sel.empty && $f.parent === sel.$to.parent && !state.doc.rangeHasMark(sel.from, sel.to, wari) && !!state.doc.textBetween(sel.from, sel.to).trim()));
+        this.bRuby.disabled = !(inRuby || (sel.empty && cellBefore(state, sel.from)) || (!sel.empty && $f.parent === sel.$to.parent && !state.doc.rangeHasMark(sel.from, sel.to, wari) && ANNOTATABLE.test(state.doc.textBetween(sel.from, sel.to))));
         // the settings of the paragraphs in the selection: shown when they are the same, else the field is empty
         const dirs = new Set(), cols = new Set();
         state.doc.nodesBetween(sel.from, sel.to, node => {
@@ -882,7 +884,7 @@ const RubyBox = {
         if (range && !range.mark) {   // a new ruby: not on the spaces at the ends of the selection (a ruby on a space alone is squeezed into its width)
             const t = state.doc.textBetween(range.from, range.to, '\n', '\n');
             const lead = t.length - t.trimStart().length, trail = t.length - t.trimEnd().length;
-            range = t.trim() ? { ...range, from: range.from + lead, to: range.to - trail } : null;
+            range = ANNOTATABLE.test(t) ? { ...range, from: range.from + lead, to: range.to - trail } : null;
         }
         if (!range) return;
         this.range = range;
