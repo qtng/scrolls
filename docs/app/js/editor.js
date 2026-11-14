@@ -926,6 +926,7 @@ const RubyBox = {
     isOpen() { return this.box && !this.box.hidden; },
     async open() {
         const { state } = this.view, sel = state.selection;
+        this.kbd = this.view.hasFocus();   // the keyboard of the phone follows the editor: it stays as it was when the box opened and closes
         let range;
         if (sel.empty) range = rubyAt(state, sel.from) || cellBefore(state, sel.from);
         else if (sel.$from.parent === sel.$to.parent && !state.doc.rangeHasMark(sel.from, sel.to, schema.marks.warichu)) {
@@ -1008,7 +1009,8 @@ const RubyBox = {
         this.box.hidden = true;
         if (this.ime) this.ime.hide();
         this.range = null;
-        if (focus) this.view.focus();
+        if (focus && this.kbd) this.view.focus();
+        else if (document.activeElement === this.input) this.input.blur();
         UI.refresh();
     },
 };
