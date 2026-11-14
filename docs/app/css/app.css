@@ -192,6 +192,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .ruby-box .deco-btn { color: var(--mark-ink); min-width: 2.2rem; font-size: 1.1rem; }
 .ruby-box .deco-btn.on { color: var(--mark-ink); background: color-mix(in srgb, var(--mark-ink) 25%, transparent); }
 .ruby-box .deco-btn[data-d="line"] { font-size: .9rem; }
+.ruby-box .deco-btn[data-d^="sesame"] { font-size: 1.9rem; line-height: 1; }
 .ruby-box .punct-sample { font-family: var(--doc-font), var(--nom), serif; }
 .ruby-box .rt-title { border-bottom: 1px solid var(--line); padding-bottom: 4px; }
 .ruby-box .rt-name { flex: 1 1 auto; padding: 0 .3rem; font-weight: 600; }
