@@ -44,7 +44,8 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .menu-row input[type=range] { flex: 1; min-width: 0; accent-color: var(--accent); }
 .menu-sep { height: 1px; margin: .25rem 0; background: var(--line); }
 
-.snackbar { position: fixed; z-index: 20; left: 50%; bottom: calc(5.5rem + env(safe-area-inset-bottom)); transform: translateX(-50%); display: flex; align-items: center; gap: 1rem; max-width: calc(100% - 2rem); padding: .6rem 1rem; border-radius: 10px; background: #51473a; color: var(--ink); box-shadow: 0 4px 14px rgba(0, 0, 0, .6); }
+.snackbar { position: fixed; z-index: 20; left: 50%; bottom: calc(5.5rem + env(safe-area-inset-bottom)); transform: translateX(-50%); display: flex; align-items: center; gap: 1rem; width: max-content; max-width: calc(100% - 2rem); padding: .6rem 1rem; border-radius: 10px; background: #51473a; color: var(--ink); box-shadow: 0 4px 14px rgba(0, 0, 0, .6); }
+#snackbar-text { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .snackbar button { min-height: 40px; padding: 0 .5rem; border: 0; background: transparent; color: var(--accent); font-weight: 600; text-transform: uppercase; }
 
 .search-bar { flex: none; padding: .5rem 1rem; background: var(--bar); border-bottom: 1px solid var(--line); }
@@ -133,7 +134,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .ProseMirror .grp.v .rb[data-side="under"] .rt { right: 100%; }
 /* a reading of single cells: spread over the whole base, each cell in an equal share (editor.js sets the size) */
 .ProseMirror .grp .rb .rt.cells { display: flex; justify-content: space-around; align-items: center; transform: none; }
-.ProseMirror .rb .rt.cells > span { flex: 1 1 0; display: flex; justify-content: center; }
+.ProseMirror .rb .rt.cells > span { flex: 1 1 0; min-width: 0; min-height: 0; display: flex; justify-content: center; }   /* a cell larger than its share overlaps its neighbour a little; the centres stay evenly spaced */
 .ProseMirror .grp.h .rb .rt.cells { left: 0; right: 0; }
 .ProseMirror .grp.v .rb .rt.cells { top: 0; bottom: 0; }
 

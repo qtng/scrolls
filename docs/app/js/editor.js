@@ -540,13 +540,13 @@ class Layout {
             sec.style.height = ((bands * inf.pitch - inf.gap + inf.pad.t + inf.pad.b) / inf.em).toFixed(4) + 'em';
         }
         // ruby: a reading of single cells (Chữ Nôm, PA, QATT) is spread evenly over its base, each cell in its share of the base (two cells on one
-        // character at a quarter and three quarters), smaller when they do not fit (each at most its share: 0.5 of the base for two); a Latin reading (Quốc Ngữ) longer than its base is narrowed
+        // character at a quarter and three quarters), smaller only from three cells a character (two keep the size of one, 0.55, and touch or overlap a little); a Latin reading (Quốc Ngữ) longer than its base is narrowed
         for (const rb of view.dom.querySelectorAll('.rb')) {
             const base = rb.firstElementChild, rt = rb.lastElementChild;
             if (!base || !rt || !rt.textContent) continue;
             if (rt.classList.contains('cells')) {
                 const share = cellsOf(base.textContent).length / Math.max(1, rt.children.length);
-                const size = Math.min(0.55, share).toFixed(3) + 'em';
+                const size = Math.min(0.55, 1.1 * share).toFixed(3) + 'em';
                 if (rt.style.fontSize !== size) rt.style.fontSize = size;
                 continue;
             }
