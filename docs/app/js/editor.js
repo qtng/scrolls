@@ -646,7 +646,7 @@ function rubyAt(state, pos, forward = false) {
     return found;
 }
 
-// Backspace and Delete next to a ruby: done here, not by the browser. The browser deletes beside the reading (contenteditable=false) itself and
+// Backspace and Delete next to a ruby: done here, not by the browser (Backspace behind a ruby first removes only the reading). The browser deletes beside the reading (contenteditable=false) itself and
 // leaves a wrong DOM behind (the base shown with the reading, the reading on the space before), which ProseMirror does not draw again.
 function deleteNextToRuby(view, back) {
     const { state } = view, sel = state.selection;
@@ -657,6 +657,10 @@ function deleteNextToRuby(view, back) {
     if (!(near && type.isInSet(near.marks)) && !(other && type.isInSet(other.marks))) return false;
     if (!near || !near.isText) return false;   // a page edge, a node: as usual
     const pos = sel.from;
+    if (back && type.isInSet(near.marks)) {   // Backspace behind a character with a ruby: first only the reading goes (all of it), the next one the character
+        const r = rubyAt(state, pos);
+        if (r) { view.dispatch(state.tr.removeMark(r.from, r.to, type).scrollIntoView()); return true; }
+    }
     let from, to;
     if (back) {
         const cells = cellsOf(state.doc.textBetween(Math.max(start, pos - 16), pos));
