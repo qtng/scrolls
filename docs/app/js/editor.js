@@ -26,7 +26,7 @@ const vi = (en, viText, tag = 'span') => { const e = el(tag, { textContent: en }
 const titled = (e, en, viText) => { e.title = en; e.setAttribute('data-vi-title', viText); e.setAttribute('aria-label', en); e.setAttribute('data-vi-aria-label', viText); return e; };
 
 // ---------------------------------------------------------------- schema
-const DECOS = ['line', 'circle', 'dot', 'sesame'], PUNCTS = ['stop', 'comma'];   // the marks beside the characters and the punctuation after them (annotation)
+const DECOS = ['line', 'circle', 'dot', 'sesame', 'sesame-open'], PUNCTS = ['stop', 'comma'];   // the marks beside the characters and the punctuation after them (annotation)
 const schema = new Schema({
     nodes: {
         doc: { content: 'section+' },
@@ -59,7 +59,7 @@ const schema = new Schema({
         warichu: { excludes: 'warichu ruby', parseDOM: [{ tag: 'span.wari' }], toDOM: () => ['span', { class: 'wari' }, 0] },
         // ruby: rt = the text shown (Quốc Ngữ, PA or QATT), qn = the reading in Quốc Ngữ (to edit it again), side = over (vertical: right) or under (left),
         // deco = a cinnabar mark beside the base as in old texts: 'line' (characters read together, a name; vertical: right, horizontal: over),
-        // 'circle', 'dot', 'sesame' (a mark beside every character: a passage stressed); punct = a cinnabar punctuation after the last character, in
+        // 'circle', 'dot', 'sesame', 'sesame-open' (a mark beside every character: a passage stressed); punct = a cinnabar punctuation after the last character, in
         // its corner ('stop' 。 the end of a sentence, 'comma' 、 a pause). The mark is the annotation of the characters: it may have any of the three
         // (reading, mark, punctuation) without the others
         ruby: {
@@ -863,6 +863,7 @@ const RubyBox = {
             ['circle', '○', 'A circle beside every character', 'Vòng tròn bên cạnh mỗi chữ'],
             ['dot', '●', 'A dot beside every character', 'Chấm bên cạnh mỗi chữ'],
             ['sesame', '﹅', 'A sesame dot beside every character', 'Chấm vừng bên cạnh mỗi chữ'],
+            ['sesame-open', '﹆', 'An open sesame dot beside every character', 'Chấm vừng rỗng bên cạnh mỗi chữ'],
         ].map(([d, content, en, vi]) => {
             const b = btn(content, en, vi, () => { this.deco = this.deco === d ? '' : d; this.markDeco(); this.input.focus(); }, 'deco-btn');
             b.dataset.d = d;

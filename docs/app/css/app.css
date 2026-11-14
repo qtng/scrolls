@@ -153,6 +153,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .ProseMirror .rb[data-deco="circle"] > .rb-b { text-emphasis-style: open circle; }
 .ProseMirror .rb[data-deco="dot"] > .rb-b { text-emphasis-style: filled circle; }
 .ProseMirror .rb[data-deco="sesame"] > .rb-b { text-emphasis-style: filled sesame; }
+.ProseMirror .rb[data-deco="sesame-open"] > .rb-b { text-emphasis-style: open sesame; }
 .ProseMirror .rb[data-deco] > .rb-b { text-emphasis-color: var(--mark-ink); text-emphasis-position: over right; }
 .ProseMirror .rb.has-rt[data-side="over"][data-deco] > .rb-b { text-emphasis-position: under left; }
 /* the punctuation after the last character, in the corner of it: 。 and 、 are set as text after the characters (outside the line and the marks of .rb-b),
