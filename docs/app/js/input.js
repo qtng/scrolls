@@ -6,7 +6,7 @@ Modes (the dropdown in the menu, app.js):
   'telex'   Telex: Vietnamese is typed with Telex in the text; the words stay Latin
   'off'     no Telex: for a keyboard or system method that writes Quốc Ngữ itself
 In both the key bar shows the candidates of the word before the caret: QATT first, PA second, then the Chữ Nôm characters (the first of them marked);
-after QATT characters the variants. The QATT and PA cells stay whole: the caret does not stop inside one, Backspace and Delete remove a whole cell,
+after QATT characters the variants. Space and Enter take the first Chữ Nôm candidate (Shift+Space, Shift+Enter do not). The QATT and PA cells stay whole: the caret does not stop inside one, Backspace and Delete remove a whole cell,
 joiners that join nothing go.
 
   NomInput.plugin            the ProseMirror plugin (editor.js puts it first)
@@ -80,10 +80,25 @@ const NomInput = (() => {
     view.focus();
   };
 
+  // Space and Enter take the preselected candidate (the first Chữ Nôm character of the word before the caret); without one they are as usual,
+  // and so are Shift+Space and Shift+Enter (a plain space or line break after a word that stays Latin)
+  const takeFirst = () => {
+    const c = candidates().find(k => k.first);
+    if (!c) return false;
+    c.run();
+    return true;
+  };
+
+  let shiftDown = false;
   const plugin = new Plugin({
     props: {
+      handleTextInput(v, from, to, text) {   // a space from a keyboard that sends no key
+        return from === to && text === ' ' && !shiftDown && takeFirst();
+      },
       handleKeyDown(v, e) {
+        shiftDown = e.shiftKey;
         if (e.isComposing || e.ctrlKey || e.metaKey || e.altKey) return false;
+        if (!e.shiftKey && (e.key === ' ' || e.key === 'Enter') && takeFirst()) return true;
         const b = block(v.state);
         if (!b) return false;
         if (e.key !== 'Backspace' && e.key !== 'Delete') return false;
@@ -103,6 +118,22 @@ const NomInput = (() => {
         if (nb) tidy(tr, nb.start, nb.text);
         v.dispatch(tr.scrollIntoView());
         return true;
+      },
+      handleDOMEvents: {
+        // keyboards that compose whole words (Android, a system method for Quốc Ngữ): the space comes with the end of the composition and takes the
+        // preselected candidate of the word before it
+        compositionend(v, e) {
+          setTimeout(() => {
+            if (!e.data || !e.data.endsWith(' ') || typeof VietIme === 'undefined') return;
+            const b = block(v.state);
+            if (!b || b.at < 2 || b.text[b.at - 1] !== ' ') return;
+            const m = WORD_END.exec(b.text.slice(0, b.at - 1));
+            if (!m) return;
+            const c = VietIme.lookup(m[0])[0];
+            if (c) v.dispatch(v.state.tr.insertText(c.glyph, b.start + b.at - 1 - m[0].length, b.start + b.at).scrollIntoView());
+          }, 0);
+          return false;
+        },
       },
     },
     // a deletion that cut a cell in two becomes the deletion of the whole cell (keyboards that bypass Backspace); joiners that join nothing go;

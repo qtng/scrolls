@@ -735,7 +735,7 @@ const UI = {
 
         this.bH1 = btn(hIcon(1), 'Heading', 'Tiêu đề', cmd(setHeading(1)));
         this.bH2 = btn(hIcon(2), 'Subheading', 'Tiêu đề phụ', cmd(setHeading(2)));
-        this.bWari = btn(vi('split', 'chia'), 'Two-column text', 'Chữ hai dòng', cmd(toggleWari));
+        this.bWari = btn(vi('Split', 'Chia'), 'Two-column text', 'Chữ hai dòng', cmd(toggleWari));
         this.bWari.classList.add('txt');
         this.bRuby = btn(el('i', { className: 'fa-solid fa-message' }), 'Annotation (reading, marks, punctuation)', 'Chú thích (cách đọc, dấu, dấu câu)', () => RubyBox.open());
         // the settings of the paragraphs are drop-downs; the group label of the list says what the option is
