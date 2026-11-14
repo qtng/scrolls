@@ -1070,7 +1070,7 @@ const imeKeys = new Plugin({
 // NomEditor.mount(element, parts, extra)   once: the view in `element`, the buttons in parts (UI.init), more plugins first (the input)
 // NomEditor.open(content, onChange)   a document (its JSON, or null for a new one); onChange() after every change of the document
 // NomEditor.json(), .text()           the document as JSON, its text (blocks on lines of their own)
-// NomEditor.setEditable(on), .editable, .focus(), .insert(text), .undo(), .redo(), .canUndo(), .canRedo(), .setTelex(on), .relayout()
+// NomEditor.setEditable(on), .editable, .focus(), .caret(), .setCaret(pos), .insert(text), .undo(), .redo(), .canUndo(), .canRedo(), .setTelex(on), .relayout()
 let view = null, changed = null, editable = false;
 const NomEditor = {
     schema, upgrade, emptyDoc,
@@ -1128,6 +1128,8 @@ const NomEditor = {
     get editable() { return editable; },
     setEditable(on) { editable = !!on; view.setProps({}); if (!on) RubyBox.close(false); UI.refresh(); },
     focus() { view.focus(); },
+    caret() { return view.state.selection.head; },   // the place of the caret (a document position), for setCaret after the document was replaced
+    setCaret(pos) { const d = view.state.doc, p = Math.max(0, Math.min(pos, d.content.size)); view.dispatch(view.state.tr.setSelection(TextSelection.near(d.resolve(p))).setMeta('addToHistory', false)); },
     insert(text) { view.dispatch(view.state.tr.insertText(text).scrollIntoView()); view.focus(); },   // at the caret (replaces the selection)
     undo() { undo(view.state, view.dispatch); },
     redo() { redo(view.state, view.dispatch); },

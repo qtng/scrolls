@@ -192,6 +192,7 @@ window.notesApp = { store, ready, flush() } is for the tests.
   // the open document is replaced by its newer version from the account (sync): the mode and the place stay
   function reload(doc) {
     const editing = NomEditor.editable, top = $('field').scrollTop, focused = editing && document.activeElement && document.activeElement.closest('.ProseMirror');
+    const caret = NomEditor.caret();
     const formatChanged = JSON.stringify(state.current.format || null) !== JSON.stringify(doc.format || null);
     state.current = { ...doc }; state.inStore = true; state.dirty = false;
     applyStyle(doc);
@@ -200,6 +201,7 @@ window.notesApp = { store, ready, flush() } is for the tests.
     setEditing(editing, false);
     showTitle();
     $('field').scrollTop = top;
+    if (editing) NomEditor.setCaret(caret);   // about the same place (the text before it may have changed)
     if (focused) NomEditor.focus();
   }
   async function showList() {
@@ -222,6 +224,7 @@ window.notesApp = { store, ready, flush() } is for the tests.
     const doc = state.docs.find(d => d.id === id);
     if (!doc) { history.replaceState(null, '', '#/'); return showList(); }
     showEditor({ ...doc }, false);
+    lastActive = Date.now();
     if (app.ready) sync();   // the account may have a newer version of it
   }
   // a link: the document is loaded by its code and shown for reading (the logo leads to the list when signed in, else to the homepage)
@@ -705,22 +708,26 @@ window.notesApp = { store, ready, flush() } is for the tests.
   });
 
   // ----- the account: signed in, the documents are synced with it (sync.js) -----
-  let syncing = false, syncTimer = 0;
+  let syncing = false, syncTimer = 0, resumeQueued = false;
   function syncSoon() { if (!DocsSync.user) return; clearTimeout(syncTimer); syncTimer = setTimeout(sync, 4000); }
-  async function sync(byHand) {
-    if (!DocsSync.user || syncing) return;
+  // resume: the open document is used again after a pause (see below): a newer version in the account replaces it, also what was typed since
+  async function sync(byHand, resume) {
+    if (!DocsSync.user) return;
+    if (syncing) { if (resume) resumeQueued = true; return; }
     syncing = true;
     if (byHand) snack('Syncing…', 'Đang đồng bộ…', { sticky: true });
     try {
       await save();
       const started = Date.now(), open = state.current && !state.shared ? state.current : null, openAt = open && open.updated;
-      const r = await DocsSync.run(state.docs, state.store, { skip: open && open.id });
+      const r = await DocsSync.run(state.docs, state.store, { skip: open && open.id, prefer: resume && open ? open.id : null });
       const cur = new Map(state.docs.map(d => [d.id, d]));   // what was typed or made while the sync ran stays (the sync worked on the documents as they were at its start)
       state.docs = r.docs.map(d => { const c = cur.get(d.id); return c && c.updated > d.updated ? { ...c, synced: d.synced } : d; })
         .concat(state.docs.filter(c => !r.docs.some(d => d.id === c.id) && c.created >= started));
       if (state.current) { const d = r.docs.find(x => x.id === state.current.id); if (d) state.current.synced = d.synced; }
       // the open document is newer in the account: taken if nothing was typed since the sync began (else what was typed wins at the next sync)
-      if (r.incoming && open && state.current === open && open.updated === openAt && !state.dirty) {
+      if (r.incoming && open && state.current === open && (resume || (open.updated === openAt && !state.dirty))) {
+        clearTimeout(saveTimer); saveTimer = null; state.dirty = false;
+        await saving;   // a save of what was typed meanwhile ends before the newer version is kept
         await DocsSync.take(r.incoming, state.store);
         const i = state.docs.findIndex(d => d.id === r.incoming.id);
         if (i < 0) state.docs.push(r.incoming); else state.docs[i] = r.incoming;
@@ -731,8 +738,20 @@ window.notesApp = { store, ready, flush() } is for the tests.
     } catch (e) {
       console.error('Sync failed:', e);
       if (byHand) snack('Could not sync (offline?)', 'Không đồng bộ được (đang ngoại tuyến?)');
-    } finally { syncing = false; }
+    } finally {
+      syncing = false;
+      if (resumeQueued) { resumeQueued = false; sync(false, true); }
+    }
   }
+  // the first key, tap or click in the document after a pause of 30 s asks the account for a newer version at once (another device may have changed it)
+  const PAUSE = 30000;
+  let lastActive = Date.now();
+  const activity = () => {
+    const now = Date.now();
+    if (now - lastActive > PAUSE && state.current && !state.shared) sync(false, true);
+    lastActive = now;
+  };
+  for (const type of ['keydown', 'pointerdown', 'beforeinput']) $('editor').addEventListener(type, activity, true);
   function renderAccount() {
     const u = DocsSync.user, label = $('account-label');
     if (u) { label.setAttribute('data-vi', 'Đăng xuất (' + (u.email || '') + ')'); label.textContent = 'Sign out (' + (u.email || '') + ')'; }

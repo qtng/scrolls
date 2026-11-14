@@ -13,7 +13,8 @@ was not changed here since (else it is uploaded again).
 
   await DocsSync.init()          the user (signed in for real) or null
   DocsSync.user, DocsSync.service the SupabaseService (js/supabase.js of qatt.org) for the login dialog
-  await DocsSync.run(local, store, { skip })   local: the documents of the browser; store: db.js; skip: the id of the open document (its newer version comes as incoming)
+  await DocsSync.run(local, store, { skip, prefer })   local: the documents of the browser; store: db.js; skip: the id of the open document (its newer version
+                                 comes as incoming); prefer: the same id after a pause (a newer version there wins even over what was typed since the last sync)
                                  returns { docs, changed, incoming }: the documents after the sync, whether any changed here, and the newer version of
                                  the open document from the account (or null)
   await DocsSync.take(doc, store)  the app took incoming: kept in the browser and marked as synced
@@ -66,7 +67,7 @@ const DocsSync = (() => {
     return doc;
   };
 
-  async function run(local, store, { skip } = {}) {
+  async function run(local, store, { skip, prefer } = {}) {
     if (!user) return { docs: local, changed: false, incoming: null };
     const db = sp.client;
     const { data, error } = await db.from('scrolls').select('id, updated_at, rev:settings->updated');
@@ -97,6 +98,7 @@ const DocsSync = (() => {
       if (!l) { download.push(id); continue; }
       const base = Math.max(l.synced || 0, marks[id] || 0), here = l.updated > base, there = rev > base;
       if (here && there && rev === l.updated) { marks[id] = rev; l.synced = rev; continue; }   // the same version on both sides
+      if (id === prefer && there) { download.push(id); continue; }   // the open document after a pause: a newer version there replaces it, whatever was typed
       if (here && there) { if (l.updated > rev) upload.push(l); else download.push(id); }   // both changed: the newer one wins (no copy)
       else if (there) download.push(id);
       else if (here) upload.push(l);
