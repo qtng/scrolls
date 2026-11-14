@@ -707,6 +707,27 @@ function deleteNextToRuby(view, back) {
     view.dispatch(state.tr.delete(from, to).scrollIntoView());
     return true;
 }
+// the reading marks of Chữ Nôm (deco rd1..rd6): not text of the document but a widget before every character of the marked text, set in the upper right corner of its cell by CSS
+const readMarks = new Plugin({
+    props: {
+        decorations(state) {
+            const out = [];
+            state.doc.descendants((node, pos) => {
+                if (!node.isText) return;
+                const m = node.marks.find(k => k.type.name === 'ruby' && /^rd[1-6]$/.test(k.attrs.deco));
+                if (!m) return;
+                const c = READMARKS[+m.attrs.deco[2] - 1];
+                let o = 0;
+                for (const ch of node.text) {
+                    if (/\S/.test(ch)) out.push(Decoration.widget(pos + o, () => { const w = document.createElement('span'); w.className = 'rd-mark'; w.dataset.c = c; w.setAttribute('aria-hidden', 'true'); return w; }, { side: -1, ignoreSelection: true, key: 'rd' + c }));
+                    o += ch.length;
+                }
+            });
+            return DecorationSet.create(state.doc, out);
+        },
+    },
+});
+
 const rubyDelete = new Plugin({
     props: {
         handleKeyDown(view, e) {
@@ -1068,6 +1089,7 @@ const NomEditor = {
             rubyDelete,   // a deletion next to a ruby, before the input (a cell of QATT or PA in a ruby too)
             ...extra,   // the input (input.js) first: its keys before the keymaps
             imeKeys,
+            readMarks,
             keymap({
                 'Mod-z': undo, 'Shift-Mod-z': redo, 'Mod-y': redo,
                 'Mod-Alt-1': setHeading(1), 'Mod-Alt-2': setHeading(2), 'Mod-Alt-0': setBlockType(S.paragraph),
