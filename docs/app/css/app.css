@@ -158,8 +158,8 @@ button { font: inherit; color: inherit; cursor: pointer; }
 /* the reading marks 𡿨 亇 个 亅 ン ソ (deco rd1..rd6): a widget before every character (readMarks, editor.js), thin, in the colour of the text, in the upper right corner of its cell */
 .ProseMirror .rd-mark { display: inline-block; inline-size: 0; block-size: 0; position: relative; overflow: visible; user-select: none; pointer-events: none; }
 .ProseMirror .rd-mark::before { content: attr(data-c); position: absolute; font-size: .42em; font-weight: 100; line-height: 1; white-space: nowrap; text-orientation: upright; color: currentcolor; }
-.ProseMirror .grp.v .rd-mark::before { right: -1.9em; top: -.07em; }
-.ProseMirror .grp.h .rd-mark::before { right: -2.9em; bottom: 1.95em; }
+.ProseMirror .grp.v .rd-mark::before { right: -2.0em; top: -.07em; }
+.ProseMirror .grp.h .rd-mark::before { right: -2.9em; bottom: 2.05em; }
 .ProseMirror .rb.has-rt[data-side="over"][data-deco]:not([data-deco^="rd"]) > .rb-b { text-emphasis-position: under left; }
 /* the punctuation after the last character, in the corner of it: 。 and 、 are set as text after the characters (outside the line and the marks of .rb-b),
    and take no room (a negative margin of their own advance). The fonts have vertical forms for them (the upper right of the cell, which lies below the last
