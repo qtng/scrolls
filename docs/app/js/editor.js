@@ -26,6 +26,7 @@ const vi = (en, viText, tag = 'span') => { const e = el(tag, { textContent: en }
 const titled = (e, en, viText) => { e.title = en; e.setAttribute('data-vi-title', viText); e.setAttribute('aria-label', en); e.setAttribute('data-vi-aria-label', viText); return e; };
 
 // ---------------------------------------------------------------- schema
+const DECOS = ['line', 'circle', 'dot', 'sesame'];   // the marks beside the base of a ruby (attribute deco)
 const schema = new Schema({
     nodes: {
         doc: { content: 'section+' },
@@ -57,16 +58,16 @@ const schema = new Schema({
     marks: {
         warichu: { excludes: 'warichu ruby', parseDOM: [{ tag: 'span.wari' }], toDOM: () => ['span', { class: 'wari' }, 0] },
         // ruby: rt = the text shown (Quốc Ngữ, PA or QATT), qn = the reading in Quốc Ngữ (to edit it again), side = over (vertical: right) or under (left),
-        // line = a cinnabar line beside the base (vertical: right, horizontal: over it), as in old texts for characters read together (a name);
-        // a ruby may have the line only, without a reading
+        // deco = a cinnabar mark beside the base as in old texts: 'line' (characters read together, a name; vertical: right, horizontal: over),
+        // 'circle', 'dot', 'sesame' (a mark beside every character: a passage stressed); a ruby may have the mark only, without a reading
         ruby: {
-            attrs: { rt: { default: '' }, qn: { default: '' }, side: { default: 'over' }, line: { default: false } },
+            attrs: { rt: { default: '' }, qn: { default: '' }, side: { default: 'over' }, deco: { default: '' } },
             inclusive: false,
             excludes: 'ruby warichu',
             // the reading (span.rt) is never text of the document: when a backspace removes the whole base, the browser may drop the span of the
             // base too, and the reading would else be read back as the base
-            parseDOM: [{ tag: 'span.rt', ignore: true }, { tag: 'span.rb', contentElement: d => d.querySelector('.rb-b') || d, getAttrs: d => ({ rt: d.getAttribute('data-rt') || '', qn: d.getAttribute('data-qn') || '', side: d.getAttribute('data-side') === 'under' ? 'under' : 'over', line: d.getAttribute('data-line') === '1' }) }],
-            toDOM: m => ['span', { class: 'rb', 'data-rt': m.attrs.rt, 'data-qn': m.attrs.qn, 'data-side': m.attrs.side, ...(m.attrs.line ? { 'data-line': '1' } : {}) }, ['span', { class: 'rb-b' }, 0], ['span', { class: 'rt', contenteditable: 'false' }, m.attrs.rt]],
+            parseDOM: [{ tag: 'span.rt', ignore: true }, { tag: 'span.rb', contentElement: d => d.querySelector('.rb-b') || d, getAttrs: d => ({ rt: d.getAttribute('data-rt') || '', qn: d.getAttribute('data-qn') || '', side: d.getAttribute('data-side') === 'under' ? 'under' : 'over', deco: DECOS.includes(d.getAttribute('data-deco')) ? d.getAttribute('data-deco') : '' }) }],
+            toDOM: m => ['span', { class: 'rb', 'data-rt': m.attrs.rt, 'data-qn': m.attrs.qn, 'data-side': m.attrs.side, ...(m.attrs.deco ? { 'data-deco': m.attrs.deco } : {}) }, ['span', { class: 'rb-b' }, 0], ['span', { class: 'rt', contenteditable: 'false' }, m.attrs.rt]],
         },
     },
 });
@@ -577,7 +578,8 @@ function rubyView(mark) {
         for (const c of cellsOf(text)) if (c.trim()) rt.append(el('span', { textContent: c }));
     } else rt.textContent = text;
     dom.dataset.side = mark.attrs.side;
-    if (mark.attrs.line) dom.dataset.line = '1';
+    if (mark.attrs.deco) dom.dataset.deco = mark.attrs.deco;
+    if (mark.attrs.rt) dom.classList.add('has-rt');
     rt.contentEditable = 'false';
     dom.append(contentDOM, rt);
     return { dom, contentDOM, ignoreMutation: m => m.type !== 'selection' && !contentDOM.contains(m.target) };
@@ -803,7 +805,7 @@ const UI = {
 
 // the box to write a ruby: a field (Quốc Ngữ, with Telex), the readings of the dictionary, the script (QN, PA, QATT), the side, each character
 const RubyBox = {
-    view: null, range: null, kind: 'qn', side: 'over', line: false,
+    view: null, range: null, kind: 'qn', side: 'over', deco: '',
     init(view) {
         this.view = view;
         try { this.kind = localStorage.getItem('scrollsRubyKind') || (window.Readings && Readings.shown && Readings.shown()[0]) || 'qn'; } catch (e) { /* default */ }
@@ -824,8 +826,18 @@ const RubyBox = {
         });
         this.input.addEventListener('input', () => this.preview());
         this.ok = btn(el('i', { className: 'fa-solid fa-check' }), 'Apply', 'Áp dụng', () => this.apply(this.input.value));
-        this.del = btn(el('i', { className: 'fa-solid fa-trash' }), 'Remove the ruby', 'Bỏ chú âm', () => { this.line = false; this.apply(''); });
-        this.lineBtn = btn(el('span', { textContent: 'Line', 'data-vi': 'Vạch' }), 'Cinnabar line beside the characters (read together)', 'Vạch son bên cạnh chữ (đọc liền)', () => { this.line = !this.line; this.markLine(); this.input.focus(); }, 'line-btn');
+        this.del = btn(el('i', { className: 'fa-solid fa-trash' }), 'Remove the ruby', 'Bỏ chú âm', () => { this.deco = ''; this.apply(''); });
+        // the marks in cinnabar beside the characters: one of them or none (a second tap takes it away)
+        this.decoBtns = [
+            ['line', el('span', { textContent: 'Line', 'data-vi': 'Vạch' }), 'Cinnabar line beside the characters (read together)', 'Vạch son bên cạnh chữ (đọc liền)'],
+            ['circle', '○', 'A circle beside every character', 'Vòng tròn bên cạnh mỗi chữ'],
+            ['dot', '●', 'A dot beside every character', 'Chấm bên cạnh mỗi chữ'],
+            ['sesame', '﹅', 'A sesame dot beside every character', 'Chấm vừng bên cạnh mỗi chữ'],
+        ].map(([d, content, en, vi]) => {
+            const b = btn(content, en, vi, () => { this.deco = this.deco === d ? '' : d; this.markDeco(); this.input.focus(); }, 'deco-btn');
+            b.dataset.d = d;
+            return b;
+        });
         this.shown = el('span', { className: 'rt-preview' });
         this.eachBtn = btn(el('i', { className: 'fa-solid fa-wand-magic-sparkles' }), 'Each character its reading from the dictionary', 'Từng chữ theo từ điển', () => this.eachChar());
         this.kindBtns = Scripts.KINDS.map(([k, label]) => {
@@ -838,7 +850,8 @@ const RubyBox = {
         this.box = el('div', { className: 'scroll-ui ruby-box bg-light', hidden: true },
             el('div', { className: 'rt-row' }, this.input, this.ok, this.del),
             el('div', { className: 'rt-row' }, this.shown),
-            el('div', { className: 'rt-row' }, ...this.kindBtns, el('span', { className: 'sep' }), this.overBtn, this.underBtn, el('span', { className: 'sep' }), this.lineBtn, this.eachBtn));
+            el('div', { className: 'rt-row' }, ...this.kindBtns, el('span', { className: 'sep' }), this.overBtn, this.underBtn, el('span', { className: 'sep' }), this.eachBtn),
+            el('div', { className: 'rt-row' }, ...this.decoBtns));
         this.box.addEventListener('mousedown', e => { if (e.target !== this.input) e.preventDefault(); });
         document.body.append(this.box);
         document.addEventListener('pointerdown', e => { if (this.isOpen() && !this.box.contains(e.target)) this.close(false); });
@@ -862,12 +875,12 @@ const RubyBox = {
         this.range = range;
         const mark = range.mark || null;
         this.side = mark ? mark.attrs.side : this.side;
-        this.line = !!(mark && mark.attrs.line);
+        this.deco = (mark && mark.attrs.deco) || '';
         this.input.value = mark ? (mark.attrs.qn || mark.attrs.rt) : '';
         this.base = state.doc.textBetween(range.from, range.to);
         this.del.hidden = !mark;
         this.eachBtn.hidden = [...this.base].length < 2;
-        this.markKind(); this.markSide(); this.markLine();
+        this.markKind(); this.markSide(); this.markDeco();
         this.box.hidden = false;
         this.place();
         this.input.focus();
@@ -888,7 +901,7 @@ const RubyBox = {
         this.shown.textContent = this.kind === 'qn' ? '' : t;
         this.shown.hidden = this.kind === 'qn';
     },
-    markLine() { this.lineBtn.classList.toggle('on', this.line); },
+    markDeco() { for (const b of this.decoBtns) b.classList.toggle('on', b.dataset.d === this.deco); },
     markKind() {
         for (const b of this.kindBtns) b.classList.toggle('on', b.dataset.k === this.kind);
     },
@@ -911,7 +924,7 @@ const RubyBox = {
         qn = (qn || '').trim();
         if (qn && this.kind !== 'qn') await Scripts.load();
         const { from, to } = this.range, type = schema.marks.ruby, tr = this.view.state.tr.removeMark(from, to, type);
-        if (qn || this.line) tr.addMark(from, to, type.create({ rt: qn ? Scripts.text(qn, this.kind) : '', qn, side: this.side, line: this.line }));
+        if (qn || this.deco) tr.addMark(from, to, type.create({ rt: qn ? Scripts.text(qn, this.kind) : '', qn, side: this.side, deco: this.deco }));
         this.view.dispatch(tr);
         this.close(true);
     },
@@ -924,7 +937,7 @@ const RubyBox = {
         let pos = from;
         chars.forEach((c, i) => {
             const qn = readings[i][0];
-            if (qn || this.line) tr.addMark(pos, pos + c.length, type.create({ rt: qn ? Scripts.text(qn, this.kind) : '', qn: qn || '', side: this.side, line: this.line }));
+            if (qn || this.deco) tr.addMark(pos, pos + c.length, type.create({ rt: qn ? Scripts.text(qn, this.kind) : '', qn: qn || '', side: this.side, deco: this.deco }));
             pos += c.length;
         });
         this.view.dispatch(tr);

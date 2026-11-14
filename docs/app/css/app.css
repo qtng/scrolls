@@ -136,11 +136,17 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .ProseMirror .grp .rb .rt.cells { display: flex; justify-content: center; align-items: center; transform: none; }
 .ProseMirror .rb .rt.cells > span { flex: none; inline-size: 1em; display: flex; justify-content: center; }
 .ProseMirror .rb .rt.cells > span + span { margin-inline-start: var(--rg, 0); }   /* the gap between the cells (editor.js), negative where they overlap */
-/* the cinnabar line of characters read together (a name): beside the base, vertical on the right, horizontal over it; text-decoration follows the
-   characters over the end of a column or line, and the reading (positioned absolutely) does not take it */
-.ProseMirror .rb[data-line="1"] > .rb-b { text-decoration-line: underline; text-decoration-color: var(--cinnabar, #e34234); text-decoration-thickness: .07em; text-decoration-skip-ink: none; }
-.ProseMirror .grp.v .rb[data-line="1"] > .rb-b { text-underline-position: right; text-underline-offset: var(--line-v, .06em); }
-.ProseMirror .grp.h .rb[data-line="1"] > .rb-b { text-underline-position: auto; text-underline-offset: var(--line-h, -1.02em); }
+/* the cinnabar marks beside the base (editor.js, deco): text decorations follow the characters over the end of a column or line, and the reading
+   (positioned absolutely) does not take them. The line of characters read together (a name): vertical on the right, horizontal over them */
+.ProseMirror .rb[data-deco="line"] > .rb-b { text-decoration-line: underline; text-decoration-color: var(--cinnabar, #e34234); text-decoration-thickness: .07em; text-decoration-skip-ink: none; }
+.ProseMirror .grp.v .rb[data-deco="line"] > .rb-b { text-underline-position: right; text-underline-offset: var(--line-v, .06em); }
+.ProseMirror .grp.h .rb[data-deco="line"] > .rb-b { text-underline-position: auto; text-underline-offset: var(--line-h, -1.02em); }
+/* a circle, dot or sesame dot beside every character (a passage stressed): on the right (horizontal: over), on the other side when a reading is there */
+.ProseMirror .rb[data-deco="circle"] > .rb-b { text-emphasis-style: open circle; }
+.ProseMirror .rb[data-deco="dot"] > .rb-b { text-emphasis-style: filled circle; }
+.ProseMirror .rb[data-deco="sesame"] > .rb-b { text-emphasis-style: filled sesame; }
+.ProseMirror .rb[data-deco] > .rb-b { text-emphasis-color: var(--cinnabar, #e34234); text-emphasis-position: over right; }
+.ProseMirror .rb.has-rt[data-side="over"][data-deco] > .rb-b { text-emphasis-position: under left; }
 .ProseMirror .grp.h .rb .rt.cells { left: 0; right: 0; }
 .ProseMirror .grp.v .rb .rt.cells { top: 0; bottom: 0; }
 
@@ -156,7 +162,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .ruby-box .rt-row { display: flex; align-items: center; gap: 2px; }
 .ruby-box .rt-input { flex: 1 1 auto; min-width: 0; height: 2.2rem; padding: 0 .5rem; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--ink); font-size: 1rem; outline: 0; }
 .ruby-box .rt-input:focus { border-color: var(--accent); }
-.ruby-box .line-btn span { color: var(--cinnabar, #e34234); }
+.ruby-box .deco-btn { color: var(--cinnabar, #e34234); min-width: 2.2rem; }
 .ruby-box .rt-preview { font-family: var(--doc-font), var(--nom), serif; font-size: 1.15rem; padding: 0 .3rem; min-height: 1.2em; }
 
 /* the key bar above the keyboard (as in Qatt.org Notes): slots of flexible width, centred; the narrow button with the triangle opens the other candidates */
