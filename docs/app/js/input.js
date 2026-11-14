@@ -300,6 +300,7 @@ const NomInput = (() => {
 
   const api = {
     plugin, parser, candidates, alternate, variants, typeShape, setDecoding, onUpdate: null,
+    cells: text => Array.from(text.matchAll(cellAny()), m => m[0]),   // the cells of a text (a QATT or PA cell whole)
     shapes: DIRECT_ORDER.map(i => String.fromCodePoint(0xF0000 + 7 * i)),
     get mode() { return mode; },
     setMode(m) { mode = ['qn', 'qatt', 'pa', 'direct', 'off'].includes(m) ? m : 'qn'; if (m === 'pa' && typeof PaText === 'undefined') mode = 'qatt'; return mode; },

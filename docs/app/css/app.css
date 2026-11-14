@@ -75,7 +75,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .fmtbar .pop.end .menu { left: auto; right: 0; }
 #size-menu .menu-row { width: 260px; padding: 0 .4rem; }
 .fmtbar .ime-select { flex: none; min-height: 40px; max-width: 7.5rem; padding: 0 .25rem; border: 1px solid var(--line); border-radius: 8px; background: transparent; color: inherit; font-size: .8rem; }
-.fmtbar .ime-select option { color: var(--ink); background: var(--bg); }
+.fmtbar .ime-select option, .fmtbar .ime-select optgroup { color: var(--ink); background: var(--bg); }
 /* the buttons of the editor (editor.js puts them into #toolbar) */
 .tools { flex: 1 1 auto; min-width: 0; display: flex; align-items: center; gap: 2px; overflow-x: auto; scrollbar-width: none; }
 .tools::-webkit-scrollbar { display: none; }
@@ -221,6 +221,7 @@ input.doc-title:focus { border-color: var(--accent); }
 .size-btn[aria-expanded="true"] { color: var(--accent); border-color: var(--accent); }
 .fmtbar .page-tools button { width: 40px; height: 40px; }
 .fmtbar .ime-select { max-width: 6.5rem; }
+.fmtbar .size-select { flex: none; width: auto; }
 
 /* shared (somebody else's link): reading only; the owner shares and ends the link from the bar */
 #view-editor.shared #edit-btn, #view-editor.shared #share-btn { display: none; }

@@ -384,7 +384,7 @@ window.notesApp = { store, ready, flush() } is for the tests.
   document.addEventListener('focusout', () => setTimeout(fitKeyboard, 350));
 
   // ----- menus -----
-  const MENUS = [['menu-btn', 'menu'], ['list-menu-btn', 'list-menu'], ['style-btn', 'style-menu'], ['size-btn', 'size-menu'], ['share-btn', 'share-menu']];
+  const MENUS = [['menu-btn', 'menu'], ['list-menu-btn', 'list-menu'], ['style-btn', 'style-menu'], ['share-btn', 'share-menu']];
   function closeMenu() { for (const [button, menu] of MENUS) { $(menu).hidden = true; $(button).setAttribute('aria-expanded', 'false'); } }
   for (const [button, menu] of MENUS) $(button).addEventListener('click', e => {
     e.stopPropagation();
@@ -394,7 +394,6 @@ window.notesApp = { store, ready, flush() } is for the tests.
     $(button).setAttribute('aria-expanded', String(open));
   });
   document.addEventListener('click', e => { if (!e.target.closest('.menu')) closeMenu(); });
-  $('size-btn').addEventListener('pointerdown', e => e.preventDefault());   // the keyboard stays
   document.addEventListener('keydown', e => { if (e.key === 'Escape') closeMenu(); });
 
   // ----- search, export, import -----
@@ -441,7 +440,7 @@ window.notesApp = { store, ready, flush() } is for the tests.
 
   // ----- font, style, size, table: they belong to the document (doc.format: only what differs from the defaults) -----
   const FONTS = qattFontsShown();   // js/fonts.js decides which fonts this visitor has; its default is the default here
-  const FORMAT_DEFAULTS = { font: (FONTS.find(f => f.default) || FONTS[0]).family, fontSize: 100, decoding: 'qatt' };
+  const FORMAT_DEFAULTS = { font: (FONTS.find(f => f.default) || FONTS[0]).family, textSize: 24, decoding: 'qatt' };
   const formatOf = doc => ({ ...FORMAT_DEFAULTS, ...(doc && doc.format && typeof doc.format === 'object' ? doc.format : {}) });
   const keepFormat = (key, value) => { const doc = state.current; if (!doc || state.shared) return; doc.format = { ...(doc.format || {}), [key]: value }; if (value === FORMAT_DEFAULTS[key]) delete doc.format[key]; schedule(); };
   // the font with its Latin, the PA behind it, then the Chữ Nôm fonts of the Chunom site (js/fonts.js)
@@ -504,14 +503,15 @@ window.notesApp = { store, ready, flush() } is for the tests.
   const MAX_CHARS = 23;
   const pageWidth = () => Math.min(MAX_CHARS, Math.round(room() / BASE * 10) / 10);   // in characters of 32 px, at most 23
   // Two sizes: the zoom (reading only, the slider of the title bar, not kept) scales the page and its text together; the font size of the
-  // document (editing, format.fontSize in %, kept and synced) scales only the text in its page of fixed width, so that more or less fits on a page.
-  // The unit (--unit) is the size of a character of 100%: the page is format.width units wide, the text is fontSize % of a unit. (Later a size of
+  // document (editing, format.textSize: the number of the list 14 … 144 that people know from a word processor, 24 by default; kept and synced) scales
+  // only the text in its page of fixed width, so that more or less fits on a page. The number is only a name: the unit (--unit) is the size of a
+  // character of 24, the page is format.width units wide, the text is textSize / 24 of a unit. (Later a size of
   // a paragraph or a character can be relative to the text of the document, in em.)
   let zoom = 100;
   function applySize(relayout = true) {   // a zoom alone needs no new layout: the layout is in em
     const doc = state.current, w = doc && doc.format && doc.format.width > 0 ? doc.format.width : pageWidth();
     // the document fills the width of the screen: smaller where it does not fit, larger where there is room, but at most twice its size
-    const fit = Math.min(2, room() / (w * BASE)), unit = BASE * fit * zoom / 100, scale = formatOf(doc).fontSize / 100;
+    const fit = Math.min(2, room() / (w * BASE)), unit = BASE * fit * zoom / 100, scale = textSizeOf(doc) / 24;
     document.documentElement.style.setProperty('--page-em', String(w));
     document.documentElement.style.setProperty('--unit', unit.toFixed(2) + 'px');
     document.documentElement.style.setProperty('--doc-size', (unit * scale).toFixed(2) + 'px');
@@ -599,13 +599,22 @@ window.notesApp = { store, ready, flush() } is for the tests.
     }, { passive: false });
   }
   // the font size of the document
+  // the font size of the document: one of the sizes of the list (a document of before keeps its percentage as the nearest size)
+  const TEXT_SIZES = [14, 16, 18, 20, 24, 28, 32, 36, 48, 72, 96, 144];
+  const nearestSize = n => TEXT_SIZES.reduce((a, b) => (Math.abs(b - n) < Math.abs(a - n) ? b : a));
+  function textSizeOf(doc) {
+    const f = doc && doc.format || {};
+    if (TEXT_SIZES.includes(f.textSize)) return f.textSize;
+    if (Number.isFinite(f.fontSize)) return nearestSize(24 * f.fontSize / 100);
+    return 24;
+  }
   const setFontSize = (value, user) => {
-    const v = step25(value, 25, 400);
-    $('set-size').value = v; $('size-label').textContent = $('size-btn-label').textContent = v + '%';
-    if (user) keepFormat('fontSize', v);
+    const v = nearestSize(Number(value) || 24);
+    $('set-size').value = String(v);
+    if (user) { if (state.current && state.current.format) delete state.current.format.fontSize; keepFormat('textSize', v); }
     applySize();
   };
-  $('set-size').addEventListener('input', () => setFontSize($('set-size').value, true));
+  $('set-size').addEventListener('change', () => { setFontSize($('set-size').value, true); NomEditor.focus(); });
   window.addEventListener('resize', () => { if (state.current) applySize(); });
   // a document without a width (a new one, or one of before): the width of this screen, kept in the document (not for a shared one)
   function fixWidth(doc) {
@@ -630,7 +639,7 @@ window.notesApp = { store, ready, flush() } is for the tests.
   function applyFormat(doc) {
     const f = formatOf(doc);
     fixWidth(doc);
-    setFont(f.font); setFontSize(f.fontSize); setZoom(100); useDecoding(f.decoding);
+    setFont(f.font); setFontSize(textSizeOf(doc)); setZoom(100); useDecoding(f.decoding);
   }
 
   // ----- delete and undo -----
