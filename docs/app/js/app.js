@@ -463,7 +463,7 @@ window.notesApp = { store, ready, flush() } is for the tests.
   langLabel();
 
   // ----- font, style, size, table: they belong to the document (doc.format: only what differs from the defaults) -----
-  const FONTS = qattFontsShown();   // js/fonts.js decides which fonts this visitor has; its default is the default here
+  const FONTS = qattFontsShown().filter(f => f.cjk);   // js/fonts.js decides which fonts this visitor has; its default is the default here
   const FORMAT_DEFAULTS = { font: (FONTS.find(f => f.default) || FONTS[0]).family, textSize: 24, decoding: 'qatt' };
   const formatOf = doc => ({ ...FORMAT_DEFAULTS, ...(doc && doc.format && typeof doc.format === 'object' ? doc.format : {}) });
   const keepFormat = (key, value) => { const doc = state.current; if (!doc || state.shared) return; doc.format = { ...(doc.format || {}), [key]: value }; if (value === FORMAT_DEFAULTS[key]) delete doc.format[key]; schedule(); };
