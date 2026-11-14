@@ -10,7 +10,8 @@ Only the pages have a style; the bars and the list keep the look of the app. Tex
   DocStyles.css(style)   the css text of a style: "background: …;\ncolor: …;\ntext-shadow: …;" and "\n--seal: …;" if it has a seal colour (what a document stores, not the name of the style)
   DocStyles.encode(css)  / decode(base64): the css text as base64 (UTF-8) and back (null if it is no base64)
   DocStyles.parse(css)   { bg, ink, shadow, seal } of css text (seal '' if none or no colour), or null if it is not plain css of this kind (no address in it: only the built-in data: textures)
-  DocStyles.apply(parsed) sets --field-bg, --field-ink, --field-shadow and --seal-color (removed without a seal colour) on <html>
+  DocStyles.idOf(parsed) the id of the built-in style of parsed css (by its background, also a former one), or ''
+  DocStyles.apply(parsed) shows a built-in style as the list has it now; sets --field-bg, --field-ink, --field-shadow and --seal-color (removed without a seal colour) on <html>
 */
 const DocStyles = (() => {
   // fibres of paper: noise in the colour r g b (0 to 1) with the opacity a
@@ -18,9 +19,12 @@ const DocStyles = (() => {
   const list = [
     { id: 'dark', en: 'Dark', vi: 'Tối', bg: '#000', ink: '#fff', shadow: 'none', plain: true },
     { id: 'light', en: 'Light', vi: 'Sáng', bg: 'linear-gradient(#ececec, #dcdcdc)', ink: '#111', shadow: 'none', plain: true },
-    { id: 'rice-paper', en: 'Calligraphy on rice paper', vi: 'Thư pháp trên giấy dó',
+    { id: 'rice-paper', en: 'Classic', vi: 'Cổ điển',
       bg: `radial-gradient(ellipse at 50% 30%, rgba(255,250,235,0) 40%, rgba(160,130,80,.24) 100%), ${noise(.45, .36, .22, .3)}, #efe6cf`,
       ink: '#1b1814', shadow: '0 0 1px rgba(20,16,10,.35)' },
+    { id: 'cinnabar-seal', en: 'Cinnabar on paper', vi: 'Chu sa trên giấy',
+      bg: `${noise(.5, .35, .3, .22)}, linear-gradient(#f4ead7, #eadcc0)`,
+      ink: '#b3261e', shadow: '1px 1px 0 rgba(255,255,255,.5)' },
     { id: 'neon-glow', en: 'Neon night', vi: 'Đêm neon',
       bg: 'radial-gradient(circle at 12% 18%, rgba(37,244,238,.28), transparent 42%), radial-gradient(circle at 88% 82%, rgba(254,44,85,.32), transparent 44%), linear-gradient(160deg, #11111a, #05050a)',
       ink: '#ffffff', shadow: '0 0 4px rgba(255,255,255,.18)' },
@@ -42,18 +46,15 @@ const DocStyles = (() => {
     { id: 'peony', en: 'Peony', vi: 'Mẫu đơn',
       bg: 'radial-gradient(ellipse at 50% 0%, rgba(255,200,215,.4), transparent 60%), linear-gradient(165deg, #d6336c, #a21e4f 70%, #7a1238)',
       ink: '#fff0f4', shadow: '0 1px 1px rgba(0,0,0,.3)', seal: '#4a0a24' },
-    { id: 'moon-night', en: 'Mid-autumn moon night', vi: 'Đêm trăng Trung thu',
-      bg: 'radial-gradient(circle at 78% 25%, rgba(255,245,200,.95) 0 28px, rgba(255,245,200,.25) 29px 70px, transparent 120px), linear-gradient(180deg, #0e1b3d, #1e2f5c)',
+    { id: 'moon-night', en: 'Autumn night', vi: 'Đêm thu', formerly: ['radial-gradient(circle at 78% 25%, rgba(255,245,200,.95) 0 28px, rgba(255,245,200,.25) 29px 70px, transparent 120px), linear-gradient(180deg, #0e1b3d, #1e2f5c)'],
+      bg: 'radial-gradient(ellipse at 80% 15%, rgba(120,150,210,.22), transparent 55%), linear-gradient(180deg, #0e1b3d, #1e2f5c)',
       ink: '#fdf6d8', shadow: '0 0 3px rgba(255,240,180,.3)' },
-    { id: 'ginkgo', en: 'Ginkgo', vi: 'Bạch quả',
-      bg: `${noise(.9, 1, .7, .12)}, radial-gradient(circle at 20% 10%, rgba(255,255,220,.35), transparent 45%), linear-gradient(160deg, #a9c47f, #6f9440)`,
-      ink: '#1f2e0e', shadow: '0 1px 0 rgba(255,255,220,.35)' },
-    { id: 'gold', en: 'Gold', vi: 'Vàng',
-      bg: `url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='300' height='300'><filter id='n' x='0' y='0' width='100%25' height='100%25'><feTurbulence type='fractalNoise' baseFrequency='.004 .9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 .35 0 0 0 0 .22 0 0 0 0 .02 0 0 0 .5 -.1'/></filter><rect width='300' height='300' filter='url(%23n)'/></svg>"), linear-gradient(115deg, #8a5a12 0%, #d9a932 14%, #fbe38a 26%, #e1b23e 38%, #a8741a 52%, #e9c25a 66%, #fff0a8 76%, #c8932a 88%, #8a5a12 100%)`,
-      ink: '#3b2606', shadow: '1px 1px 0 rgba(255,238,160,.5)' },
-    { id: 'cinnabar-seal', en: 'Cinnabar on paper', vi: 'Chu sa trên giấy',
-      bg: `${noise(.5, .35, .3, .22)}, linear-gradient(#f4ead7, #eadcc0)`,
-      ink: '#b3261e', shadow: '1px 1px 0 rgba(255,255,255,.5)' },
+    { id: 'ginkgo', en: 'Green ink wash', vi: 'Thủy mặc xanh', formerly: [`${noise(.9, 1, .7, .12)}, radial-gradient(circle at 20% 10%, rgba(255,255,220,.35), transparent 45%), linear-gradient(160deg, #a9c47f, #6f9440)`],
+      bg: 'radial-gradient(ellipse 120% 40% at 20% 100%, rgba(45,75,55,.55), transparent 70%), radial-gradient(ellipse 100% 35% at 85% 100%, rgba(70,100,75,.45), transparent 70%), linear-gradient(180deg, #e4ece1 0%, #c3d3be 55%, #9db49a 100%)',
+      ink: '#14211a', shadow: '0 0 1px rgba(255,255,255,.5)' },
+    { id: 'gold', en: 'Brushed aluminium', vi: 'Nhôm xước', formerly: [`url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='300' height='300'><filter id='n' x='0' y='0' width='100%25' height='100%25'><feTurbulence type='fractalNoise' baseFrequency='.004 .9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 .35 0 0 0 0 .22 0 0 0 0 .02 0 0 0 .5 -.1'/></filter><rect width='300' height='300' filter='url(%23n)'/></svg>"), linear-gradient(115deg, #8a5a12 0%, #d9a932 14%, #fbe38a 26%, #e1b23e 38%, #a8741a 52%, #e9c25a 66%, #fff0a8 76%, #c8932a 88%, #8a5a12 100%)`],
+      bg: `url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='300' height='300'><filter id='n' x='0' y='0' width='100%25' height='100%25'><feTurbulence type='fractalNoise' baseFrequency='.004 .9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 .3 0 0 0 0 .32 0 0 0 0 .35 0 0 0 .18 0'/></filter><rect width='300' height='300' filter='url(%23n)'/></svg>"), linear-gradient(115deg, #c3c7cb 0%, #dde0e3 30%, #cfd3d7 55%, #e4e6e8 75%, #c6cacd 100%)`,
+      ink: '#1f2428', shadow: '0 1px 0 rgba(255,255,255,.45)' },
   ];
   const defaultId = 'sakura-dusk';
   const css = s => `background: ${s.bg};\ncolor: ${s.ink};\ntext-shadow: ${s.shadow};` + (s.seal ? `\n--seal: ${s.seal};` : '');
@@ -72,23 +73,29 @@ const DocStyles = (() => {
     return bg && ink ? { bg, ink, shadow: probe.getPropertyValue('text-shadow') || 'none', seal: seal && colour.color ? colour.color : '' } : null;
   };
   const random = () => { const pool = list.filter(s => !s.plain); return pool[Math.floor(Math.random() * pool.length)]; };
-  // the built-in styles by their background as the browser writes it: the effect of the list replaces the one stored with a document
+  // the built-in styles by their background as the browser writes it (also the backgrounds they had before, `formerly`): a document of a built-in
+  // style shows the style of the list as it is now (its background, ink and effect), not the copy stored with it
   let known = null;
-  const shadowOf = parsed => {
+  const builtIn = parsed => {
     if (!known) {
       known = new Map();
       const probe = document.createElement('div').style;
-      for (const st of list) { probe.background = st.bg; known.set(probe.getPropertyValue('background'), st.shadow); }
+      for (const st of list) for (const bg of [st.bg, ...(st.formerly || [])]) { probe.background = bg; known.set(probe.getPropertyValue('background'), st); }
     }
-    return known.has(parsed.bg) ? known.get(parsed.bg) : parsed.shadow;
+    return known.get(parsed.bg) || null;
   };
+  const current = parsed => {
+    const st = builtIn(parsed);
+    return st ? { ...parsed, bg: st.bg, ink: st.ink, shadow: st.shadow, seal: st.seal || '' } : parsed;
+  };
+  const idOf = parsed => { const st = parsed && builtIn(parsed); return st ? st.id : ''; };
   const apply = parsed => {
     const root = document.documentElement.style;
-    parsed = { ...parsed, shadow: shadowOf(parsed) };
+    parsed = current(parsed);
     root.setProperty('--field-bg', parsed.bg);
     root.setProperty('--field-ink', parsed.ink);
     root.setProperty('--field-shadow', parsed.shadow);
     if (parsed.seal) root.setProperty('--seal-color', parsed.seal); else root.removeProperty('--seal-color');
   };
-  return { list, defaultId, random, css, encode, decode, parse, apply };
+  return { list, defaultId, random, css, encode, decode, parse, apply, idOf };
 })();

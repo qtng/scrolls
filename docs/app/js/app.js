@@ -473,8 +473,8 @@ window.notesApp = { store, ready, flush() } is for the tests.
   const styleOf = doc => DocStyles.parse(DocStyles.decode(doc.style || '')) || DocStyles.parse(DocStyles.css(styleById(DocStyles.defaultId)));
   function applyStyle(doc) {
     DocStyles.apply(styleOf(doc));
-    const current = DocStyles.decode(doc.style || '') || DocStyles.css(styleById(DocStyles.defaultId));
-    document.querySelectorAll('#set-style button').forEach(b => b.setAttribute('aria-checked', String(DocStyles.css(styleById(b.dataset.style)) === current)));
+    const current = DocStyles.idOf(styleOf(doc));
+    document.querySelectorAll('#set-style button').forEach(b => b.setAttribute('aria-checked', String(b.dataset.style === current)));
   }
   for (const s of DocStyles.list) {
     const b = document.createElement('button'), box = document.createElement('span'), label = document.createElement('span');
