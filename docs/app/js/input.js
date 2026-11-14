@@ -2,21 +2,17 @@
 The input of Nôm Notes (app/) on the editor (editor.js): the logic of Qatt.org Notes (notes-editor.js) for ProseMirror instead of a text area.
 Needs VietnameseParser (parser.js), QattText (qatt-text.js), PaText (pa-text.js), VietIme (ime.js) and PM.
 
-Modes (the dropdown of the format bar, app.js):
-  'qn'      Quốc Ngữ: Telex, the words stay Latin; the key bar shows the Chữ Nôm candidates of the word before the caret
-  'qatt'    QATT Telex: a word becomes QATT characters at a space or any other character that is no letter (the space goes: the cells are squares);
-            Enter turns it into PA instead (the first slot of the key bar). The key bar: PA, then the Chữ Nôm candidates; after a QATT word the variants
-  'pa'      PA Telex: a word becomes PA at a space; Enter and the first slot give QATT
-  'direct'  QATT direct input: no Telex; the 22 shapes in a bar of their own; a digit 1–8 behind a letter is its tone
-  'off'     no Telex
-In every mode the QATT and PA cells stay whole: the caret does not stop inside one, Backspace and Delete remove a whole cell, joiners that join nothing go.
+Modes (the dropdown in the menu, app.js):
+  'telex'   Telex: Vietnamese is typed with Telex in the text; the words stay Latin
+  'off'     no Telex: for a keyboard or system method that writes Quốc Ngữ itself
+In both the key bar shows the candidates of the word before the caret: QATT first, PA second, then the Chữ Nôm characters (the first of them marked);
+after QATT characters the variants. The QATT and PA cells stay whole: the caret does not stop inside one, Backspace and Delete remove a whole cell,
+joiners that join nothing go.
 
   NomInput.plugin            the ProseMirror plugin (editor.js puts it first)
   NomInput.setMode(m), .mode
-  NomInput.candidates()      [{ glyph, reading, definition, run() }] of the word before the caret
-  NomInput.alternate()       { glyph, script, run() } or null: the word before the caret in the other script
+  NomInput.candidates()      the word before the caret as QATT and PA { glyph, script, run() }, then the Chữ Nôm characters { glyph, reading, definition, first?, run() }
   NomInput.variants()        the three slots [neutral, tham, plain]: { id, view, en, vi, run() } or undefined
-  NomInput.shapes, .typeShape(k)   direct input
   NomInput.setDecoding(name, recode)  the rhyme table; recode: every cell of the document is read with the old one and written with the new one
   NomInput.onUpdate          called after every change of the editor (the key bar follows it)
 */
@@ -30,16 +26,11 @@ const NomInput = (() => {
   const RUBY_BASE_RE = '[\\u{2E80}-\\u{D7FF}\\u{F900}-\\u{FAFF}\\u{20000}-\\u{3FFFF}]', RUBY_START = new RegExp('^' + RUBY_BASE_RE + '[\\u{F00B0}\\u{F00B1}]', 'u');
   const rubyUnit = () => RUBY_BASE_RE + '[\\u{F00B0}\\u{F00B1}](?:' + (typeof PaText === 'undefined' ? '' : PaText.CELL.source + '(?:[\\u{F00FF}-\\u{F0108}][\\u{F0109}-\\u{F010E}]?)?|') + QattText.CELL.source + ')';
   const cellAny = () => new RegExp(rubyUnit() + '|' + QattText.CELL.source + '|' + (typeof PaText === 'undefined' ? '' : PaText.CELL.source + '|') + '[\\u{F009A}-\\u{F00A3}]+|[\\u{F00D0}\\u{F00D1}]|[^]', 'gu');
-  const DIRECT_ORDER = [5, 0, 1, 2, 3, 4, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21];
-  const MARK_CYCLE = [0, 2, 3, 4, 5, 6, 1], DIRECT_TONES = [null, 160, 157, 158, 159, 161, 162, 163, 156];
   const WINDOW = 64;
 
-  let view = null, mode = 'qn';
+  let view = null, mode = 'telex';
   const parser = new VietnameseParser('qatt');
-  const telexOn = () => mode !== 'direct' && mode !== 'off';
-  const script = () => (mode === 'pa' ? 'pa' : 'qatt');
-  const enterScript = () => (mode === 'pa' ? 'qatt' : 'pa');
-  const converts = () => mode === 'qatt' || mode === 'pa';
+  const telexOn = () => mode === 'telex';
 
   // the textblock with the caret: its text (all inline content is text, so offsets in it are positions from its start) and the caret in it
   const block = state => {
@@ -48,13 +39,8 @@ const NomInput = (() => {
     const $c = sel.$from, p = $c.parent;
     return { start: $c.start(), text: p.textBetween(0, p.content.size, null, '￼'), at: $c.parentOffset };
   };
-  // the word that ends at `end` of a text in the script: { from, text } or null
-  const convertWord = (text, end, sc) => {
-    const m = WORD_END.exec(text.slice(0, end));
-    if (!m) return null;
-    const out = sc === 'pa' ? (typeof PaText !== 'undefined' && PaText.word(m[0], parser, { stacked: true })) : QattText.word(m[0], parser);
-    return out ? { from: end - m[0].length, text: out } : null;
-  };
+  // a word in QATT or PA characters (or null)
+  const inScript = (word, sc) => (sc === 'pa' ? (typeof PaText !== 'undefined' && PaText.word(word, parser, { stacked: true })) : QattText.word(word, parser)) || null;
 
   // ----- the cells -----
   const cellAt = (text, pos, which) => {
@@ -87,53 +73,19 @@ const NomInput = (() => {
   const tidy = (tr, start, text) => { for (const [i, len] of orphans(text)) tr.delete(start + i, start + i + len); return tr; };
   const blockOf = (doc, pos) => { const $p = doc.resolve(pos); const p = $p.parent; return p.isTextblock ? { start: $p.start(), text: p.textBetween(0, p.content.size, null, '￼') } : null; };
 
-  // ----- typing -----
-  function convertAt(view, pos, typed) {   // the character `typed` comes at `pos`: the word before it converts; a space goes
-    const b = blockOf(view.state.doc, pos);
-    if (!b) return false;
-    const end = pos - b.start, w = convertWord(b.text, end, script());
-    if (!w) return false;
-    const tr = view.state.tr.insertText(w.text, b.start + w.from, pos);
-    if (typed && !/^\s$/.test(typed)) tr.insertText(typed);
-    view.dispatch(tr.scrollIntoView());
-    return true;
-  }
-  const cpBefore = (text, at) => { const c = text.codePointAt(at - 2); return c > 0xFFFF ? c : text.charCodeAt(at - 1); };
   const put = (from, to, text) => {   // a change of the textblock with the caret (offsets in it)
     const b = block(view.state);
     if (!b) return;
-    const tr = view.state.tr.insertText(text, b.start + from, b.start + to);
-    view.dispatch(tr.scrollIntoView());
+    view.dispatch(view.state.tr.insertText(text, b.start + from, b.start + to).scrollIntoView());
     view.focus();
   };
 
   const plugin = new Plugin({
     props: {
-      handleTextInput(v, from, to, text) {
-        if (from !== to || text.length < 1) return false;
-        if (mode === 'direct' && /^[1-8]$/.test(text)) {   // a digit behind a letter (and its tone marks) gives that tone; another digit replaces it
-          const b = blockOf(v.state.doc, from);
-          if (!b) return false;
-          const at = from - b.start;
-          let f = at;
-          while (f >= 2 && cpBefore(b.text, f) >= 0xF009C && cpBefore(b.text, f) <= 0xF00A3) f -= 2;
-          if (f < 2 || !LETTER(cpBefore(b.text, f))) return false;
-          v.dispatch(v.state.tr.insertText(String.fromCodePoint(0xF0000 + DIRECT_TONES[+text]), b.start + f, from));
-          return true;
-        }
-        if (!converts() || v.composing || !NOT_LETTER.test(text)) return false;
-        return convertAt(v, from, text);
-      },
       handleKeyDown(v, e) {
         if (e.isComposing || e.ctrlKey || e.metaKey || e.altKey) return false;
         const b = block(v.state);
         if (!b) return false;
-        if (e.key === 'Enter' && !e.shiftKey && converts()) {   // Enter takes the first slot: the word in the other script
-          const w = convertWord(b.text, b.at, enterScript());
-          if (!w) return false;
-          v.dispatch(v.state.tr.insertText(w.text, b.start + w.from, b.start + b.at).scrollIntoView());
-          return true;
-        }
         if (e.key !== 'Backspace' && e.key !== 'Delete') return false;
         const back = e.key === 'Backspace', pos = b.at;
         const cell = cellAt(b.text, pos, back ? 'before' : 'after');
@@ -151,23 +103,6 @@ const NomInput = (() => {
         if (nb) tidy(tr, nb.start, nb.text);
         v.dispatch(tr.scrollIntoView());
         return true;
-      },
-      handleDOMEvents: {
-        // keyboards that compose whole words (Android): the space comes with the end of the composition
-        compositionend(v, e) {
-          setTimeout(() => {
-            if (!converts() || !e.data || !NOT_LETTER.test(e.data.slice(-1))) return;
-            const b = block(v.state);
-            if (!b || b.at < 1) return;
-            const typed = b.text.slice(b.at - 1, b.at);
-            if (!NOT_LETTER.test(typed)) return;
-            const w = convertWord(b.text, b.at - 1, script());
-            if (!w) return;
-            const tr = v.state.tr.insertText(w.text + (/^\s$/.test(typed) ? '' : typed), b.start + w.from, b.start + b.at);
-            v.dispatch(tr.scrollIntoView());
-          }, 0);
-          return false;
-        },
       },
     },
     // a deletion that cut a cell in two becomes the deletion of the whole cell (keyboards that bypass Backspace); joiners that join nothing go;
@@ -204,35 +139,30 @@ const NomInput = (() => {
   const blockFrom = block;
 
   // ----- the key bar -----
-  const candidates = () => {
-    if (!view || mode === 'direct' || mode === 'off' || typeof VietIme === 'undefined') return [];
-    const b = block(view.state);
-    if (!b) return [];
-    const next = b.text.charAt(b.at);
-    if (next && !NOT_LETTER.test(next)) return [];   // in the middle of a word
-    const m = WORD_END.exec(b.text.slice(0, b.at));
-    if (!m) return [];
-    const from = b.at - m[0].length, word = view.composing ? VietIme.telex(m[0]) : m[0];
-    return VietIme.lookup(word).map(c => ({ ...c, run: () => put(from, b.at, c.glyph) }));
-  };
-  const alternate = () => {
-    if (!view || !converts()) return null;
+  // the word before the caret (not in the middle of a word), as Latin letters: { word, from, at } or null
+  const wordBefore = () => {
+    if (!view || typeof VietIme === 'undefined') return null;
     const b = block(view.state);
     if (!b) return null;
     const next = b.text.charAt(b.at);
     if (next && !NOT_LETTER.test(next)) return null;
     const m = WORD_END.exec(b.text.slice(0, b.at));
     if (!m) return null;
-    const sc = enterScript(), word = view.composing ? VietIme.telex(m[0]) : m[0];
-    const glyph = sc === 'pa' ? (typeof PaText !== 'undefined' && PaText.word(word, parser, { stacked: true })) : QattText.word(word, parser);
-    if (!glyph) return null;
-    const from = b.at - m[0].length;
-    return { glyph, script: sc, run: () => put(from, b.at, glyph) };
+    return { word: view.composing && telexOn() ? VietIme.telex(m[0]) : m[0], from: b.at - m[0].length, at: b.at };
+  };
+  // QATT first, PA second, then the Chữ Nôm characters (the first of them marked)
+  const candidates = () => {
+    const w = wordBefore();
+    if (!w) return [];
+    const out = [];
+    for (const sc of ['qatt', 'pa']) { const glyph = inScript(w.word, sc); if (glyph) out.push({ glyph, script: sc, run: () => put(w.from, w.at, glyph) }); }
+    VietIme.lookup(w.word).forEach((c, i) => out.push({ ...c, first: i === 0, run: () => put(w.from, w.at, c.glyph) }));
+    return out;
   };
   // the variants of the QATT characters before the caret (Tham Thư, Neutral tone, Unmarked)
   const variants = () => {
     const SLOTS = ['neutral', 'tham', 'plain'];
-    if (!view || mode === 'pa') return SLOTS.map(() => undefined);
+    if (!view) return SLOTS.map(() => undefined);
     const b = block(view.state);
     if (!b) return SLOTS.map(() => undefined);
     const at = b.at, utf16 = c => (c > 0xFFFF ? 2 : 1);
@@ -259,31 +189,6 @@ const NomInput = (() => {
     return SLOTS.map(id => list.find(v => v.id === id));
   };
 
-  // ----- direct input: the shape k (the order of VietnameseParser.SHAPES), as in Qatt.org Notes -----
-  function typeShape(k) {
-    const b = view && block(view.state);
-    if (!b) return;
-    const text = b.text, at = b.at, base = 7 * DIRECT_ORDER[k];
-    const prev = at >= 2 ? cpBefore(text, at) : 0;
-    const J = String.fromCodePoint(JOINER), mark = c => (c - 0xF0000) % 7;
-    const marked = c => LETTER(c) && mark(c) !== 0;
-    const firstPart = end => end >= 2 && marked(cpBefore(text, end)) && mark(cpBefore(text, end)) !== 1 && !(end >= 4 && (cpBefore(text, end - 2) === JOINER || cpBefore(text, end - 2) === COMBINER));
-    let from, cp;
-    if (prev >= 0xF0000 + base && prev < 0xF0000 + base + 7) {   // iterate the letter before the caret
-      const inPair = at >= 4 && cpBefore(text, at - 2) === JOINER;
-      let i = MARK_CYCLE.indexOf(prev - 0xF0000 - base);
-      do i = (i + 1) % MARK_CYCLE.length; while (inPair && MARK_CYCLE[i] === 1);
-      cp = 0xF0000 + base + MARK_CYCLE[i]; from = at - 2;
-      if (inPair && MARK_CYCLE[i] !== 0 && marked(cpBefore(text, at - 4))) { put(at - 4, at, String.fromCodePoint(cp)); return; }
-    } else if (LETTER(prev) && mark(prev) !== 1 && !(at >= 4 && (cpBefore(text, at - 2) === JOINER || cpBefore(text, at - 2) === COMBINER))) {
-      put(at, at, J + String.fromCodePoint(0xF0000 + base)); return;   // behind a letter: a pair
-    } else {
-      from = text[at - 1] === ' ' ? at - 1 : at;   // a space right before it goes
-      cp = 0xF0000 + base;
-    }
-    put(from, at, (mark(cp) === 0 && firstPart(from) ? J : '') + String.fromCodePoint(cp));
-  }
-
   // the rhyme table; recode: every QATT cell of the document is read with the old table and written with the new one
   function setDecoding(name, recode) {
     if (recode && view && name !== parser.decoding) {
@@ -299,11 +204,10 @@ const NomInput = (() => {
   }
 
   const api = {
-    plugin, parser, candidates, alternate, variants, typeShape, setDecoding, onUpdate: null,
+    plugin, parser, candidates, variants, setDecoding, onUpdate: null,
     cells: text => Array.from(text.matchAll(cellAny()), m => m[0]),   // the cells of a text (a QATT or PA cell whole)
-    shapes: DIRECT_ORDER.map(i => String.fromCodePoint(0xF0000 + 7 * i)),
     get mode() { return mode; },
-    setMode(m) { mode = ['qn', 'qatt', 'pa', 'direct', 'off'].includes(m) ? m : 'qn'; if (m === 'pa' && typeof PaText === 'undefined') mode = 'qatt'; return mode; },
+    setMode(m) { mode = m === 'off' ? 'off' : 'telex'; return mode; },
     telexOn,
   };
   void blockFrom;
