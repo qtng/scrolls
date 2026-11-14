@@ -125,6 +125,9 @@ button { font: inherit; color: inherit; cursor: pointer; }
 /* ruby: the base keeps its cell; the reading sits beside it (horizontal: over / under, vertical: right / left), narrowed along the line by editor.js (--rs) */
 .ProseMirror .rb { position: relative; }
 .ProseMirror .grp p:has(.rb), .ProseMirror .grp h1:has(.rb), .ProseMirror .grp h2:has(.rb) { line-height: 2.2; }
+/* a reading on the other side too (under: left in vertical text): the column needs room for it, else it meets the reading of the column next to it (the
+   reading is .54 wide and stands .22 off the character: one side 2.2 em, both sides about 2.6 em of a column; a neighbour of 2.2 counts half of it) */
+.ProseMirror .grp p:has(.rb[data-side="under"]), .ProseMirror .grp h1:has(.rb[data-side="under"]), .ProseMirror .grp h2:has(.rb[data-side="under"]) { line-height: 2.7; }
 /* the box of a character differs with the font (--rt-a, --rt-d, --rt-bw: its content area in em, measured by editor.js; the reference is QATT Pen: 1.16 above,
    .288 below the baseline, 1.448 wide), the ink in it does not move as much: the reading and the line are set back by what the box lacks (the factors from
    measuring the fonts); --bem is the size of the base in px, whatever the size of the reading */
@@ -147,18 +150,30 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .ProseMirror .grp.v .rb[data-deco="line"] > .rb-b { text-underline-position: right; text-underline-offset: calc(.06em + (1.448 - var(--rt-bw, 1.448)) * .19em); }
 .ProseMirror .grp.h .rb[data-deco="line"] > .rb-b { text-underline-position: auto; text-underline-offset: var(--line-h, -1.02em); }
 /* a circle, dot or sesame dot beside every character (a passage stressed): on the right (horizontal: over), on the other side when a reading is there */
-.ProseMirror .rb[data-deco="circle"] > .rb-b { text-emphasis-style: open circle; }
-.ProseMirror .rb[data-deco="dot"] > .rb-b { text-emphasis-style: filled circle; }
-.ProseMirror .rb[data-deco="sesame"] > .rb-b { text-emphasis-style: filled sesame; }
-.ProseMirror .rb[data-deco] > .rb-b { text-emphasis-color: var(--mark-ink); text-emphasis-position: over right; }
-.ProseMirror .rb.has-rt[data-side="over"][data-deco] > .rb-b { text-emphasis-position: under left; }
-/* the punctuation after the last character, in its corner, taking no room: positioned absolutely without insets it stays where it would follow
-   the last character (also behind the end of a column or line) and takes neither the line nor the dots of the base; margins move it */
-.ProseMirror .rb[data-punct] > .rb-b::after { position: absolute; color: var(--mark-ink); font-size: 1em; line-height: 1; font-weight: 700; }
-.ProseMirror .rb[data-punct="stop"] > .rb-b::after { content: '\3002'; }
-.ProseMirror .rb[data-punct="comma"] > .rb-b::after { content: '\3001'; }
-.ProseMirror .grp.v .rb[data-punct] > .rb-b::after { margin-block-start: var(--punct-v-b, -.3em); margin-inline-start: var(--punct-v-i, -.8em); }
-.ProseMirror .grp.h .rb[data-punct] > .rb-b::after { margin-block-start: var(--punct-h-b, .68em); margin-inline-start: var(--punct-h-i, -.2em); }
+.ProseMirror .rb[data-deco="circle"] > .rb-b { text-emphasis-style: '\25CB'; }
+.ProseMirror .rb[data-deco="dot"] > .rb-b { text-emphasis-style: '\25CF'; }
+.ProseMirror .rb[data-deco="sesame"] > .rb-b { text-emphasis-style: '\FE45'; }
+.ProseMirror .rb[data-deco="sesame-open"] > .rb-b { text-emphasis-style: '\FE46'; }
+.ProseMirror .rb[data-deco]:not([data-deco^="rd"]) > .rb-b { text-emphasis-color: var(--mark-ink); text-emphasis-position: over right; }
+/* the reading marks 𡿨 亇 个 亅 ン ソ (deco rd1..rd6): a widget before every character (readMarks, editor.js), thin, in the colour of the text, in the upper right corner of its cell */
+.ProseMirror .rd-mark { display: inline-block; inline-size: 0; block-size: 0; position: relative; overflow: visible; user-select: none; pointer-events: none; }
+.ProseMirror .rd-mark::before { content: attr(data-c); position: absolute; font-size: .42em; font-weight: 100; line-height: 1; white-space: nowrap; text-orientation: upright; color: currentcolor; transform: scaleX(var(--rd-sx, .5)); transform-origin: right center; }
+.ProseMirror .grp.v .rd-mark::before { right: -1.6em; top: -.07em; }
+.ProseMirror .grp.h .rd-mark::before { right: -2.7em; bottom: 1.65em; }
+.ProseMirror .rb.has-rt[data-side="over"][data-deco]:not([data-deco^="rd"]) > .rb-b { text-emphasis-position: under left; }
+/* the punctuation after the last character, in the corner of it: 。 and 、 are set as text after the characters (outside the line and the marks of .rb-b),
+   and take no room (a negative margin of their own advance). The fonts have vertical forms for them (the upper right of the cell, which lies below the last
+   character: the lower right of it), horizontal ones in the lower left of the cell after it: both stand in the corner, whatever the size */
+.ProseMirror .rb[data-punct]::after { color: var(--mark-ink); font-weight: 700; line-height: 1; margin-inline-end: -1em; }
+.ProseMirror .rb[data-punct="stop"]::after { content: '\3002'; }
+.ProseMirror .rb[data-punct="comma"]::after { content: '\3001'; }
+/* the middle of the mark on the lower right corner of the cell of the character (measured on the forms of QATT Pen: the vertical forms stand in the upper
+   right, the horizontal ones in the lower left of their cell; the offsets in em of the mark) */
+.ProseMirror .rb[data-punct]::after { position: relative; }
+.ProseMirror .grp.v .rb[data-punct="stop"]::after { left: .186em; top: -.214em; }
+.ProseMirror .grp.v .rb[data-punct="comma"]::after { left: .204em; top: -.253em; }
+.ProseMirror .grp.h .rb[data-punct="stop"]::after { left: -.174em; top: .199em; }
+.ProseMirror .grp.h .rb[data-punct="comma"]::after { left: -.196em; top: .229em; }
 .ProseMirror .grp.h .rb .rt.cells { left: 0; right: 0; }
 .ProseMirror .grp.v .rb .rt.cells { top: 0; bottom: 0; }
 
@@ -177,6 +192,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .ruby-box .deco-btn { color: var(--mark-ink); min-width: 2.2rem; font-size: 1.1rem; }
 .ruby-box .deco-btn.on { color: var(--mark-ink); background: color-mix(in srgb, var(--mark-ink) 25%, transparent); }
 .ruby-box .deco-btn[data-d="line"] { font-size: .9rem; }
+.ruby-box .deco-btn[data-d^="sesame"] { font-size: 1.9rem; line-height: 1; }
 .ruby-box .punct-sample { font-family: var(--doc-font), var(--nom), serif; }
 .ruby-box .rt-title { border-bottom: 1px solid var(--line); padding-bottom: 4px; }
 .ruby-box .rt-name { flex: 1 1 auto; padding: 0 .3rem; font-weight: 600; }

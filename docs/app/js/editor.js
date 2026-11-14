@@ -26,7 +26,8 @@ const vi = (en, viText, tag = 'span') => { const e = el(tag, { textContent: en }
 const titled = (e, en, viText) => { e.title = en; e.setAttribute('data-vi-title', viText); e.setAttribute('aria-label', en); e.setAttribute('data-vi-aria-label', viText); return e; };
 
 // ---------------------------------------------------------------- schema
-const DECOS = ['line', 'circle', 'dot', 'sesame'], PUNCTS = ['stop', 'comma'];   // the marks beside the characters and the punctuation after them (annotation)
+const READMARKS = ['𡿨', '亇', '个', '亅', 'ン', 'ソ'];   // reading marks of Chữ Nôm (deco rd1..rd6): small, in the colour of the text, beside every character
+const DECOS = ['line', 'circle', 'dot', 'sesame', 'sesame-open', ...Array.from({ length: 6 }, (_, i) => 'rd' + (i + 1))], PUNCTS = ['stop', 'comma'];   // the marks beside the characters and the punctuation after them (annotation)
 const schema = new Schema({
     nodes: {
         doc: { content: 'section+' },
@@ -59,7 +60,7 @@ const schema = new Schema({
         warichu: { excludes: 'warichu ruby', parseDOM: [{ tag: 'span.wari' }], toDOM: () => ['span', { class: 'wari' }, 0] },
         // ruby: rt = the text shown (Quốc Ngữ, PA or QATT), qn = the reading in Quốc Ngữ (to edit it again), side = over (vertical: right) or under (left),
         // deco = a cinnabar mark beside the base as in old texts: 'line' (characters read together, a name; vertical: right, horizontal: over),
-        // 'circle', 'dot', 'sesame' (a mark beside every character: a passage stressed); punct = a cinnabar punctuation after the last character, in
+        // 'circle', 'dot', 'sesame', 'sesame-open' (a mark beside every character: a passage stressed); punct = a cinnabar punctuation after the last character, in
         // its corner ('stop' 。 the end of a sentence, 'comma' 、 a pause). The mark is the annotation of the characters: it may have any of the three
         // (reading, mark, punctuation) without the others
         ruby: {
@@ -706,6 +707,27 @@ function deleteNextToRuby(view, back) {
     view.dispatch(state.tr.delete(from, to).scrollIntoView());
     return true;
 }
+// the reading marks of Chữ Nôm (deco rd1..rd6): not text of the document but a widget before every character of the marked text, set in the upper right corner of its cell by CSS
+const readMarks = new Plugin({
+    props: {
+        decorations(state) {
+            const out = [];
+            state.doc.descendants((node, pos) => {
+                if (!node.isText) return;
+                const m = node.marks.find(k => k.type.name === 'ruby' && /^rd[1-6]$/.test(k.attrs.deco));
+                if (!m) return;
+                const c = READMARKS[+m.attrs.deco[2] - 1];
+                let o = 0;
+                for (const ch of node.text) {
+                    if (/\S/.test(ch)) out.push(Decoration.widget(pos + o, () => { const w = document.createElement('span'); w.className = 'rd-mark'; w.dataset.c = c; w.setAttribute('aria-hidden', 'true'); return w; }, { side: -1, ignoreSelection: true, key: 'rd' + c }));
+                    o += ch.length;
+                }
+            });
+            return DecorationSet.create(state.doc, out);
+        },
+    },
+});
+
 const rubyDelete = new Plugin({
     props: {
         handleKeyDown(view, e) {
@@ -863,6 +885,8 @@ const RubyBox = {
             ['circle', '○', 'A circle beside every character', 'Vòng tròn bên cạnh mỗi chữ'],
             ['dot', '●', 'A dot beside every character', 'Chấm bên cạnh mỗi chữ'],
             ['sesame', '﹅', 'A sesame dot beside every character', 'Chấm vừng bên cạnh mỗi chữ'],
+            ['sesame-open', '﹆', 'An open sesame dot beside every character', 'Chấm vừng rỗng bên cạnh mỗi chữ'],
+            ...READMARKS.map((c, i) => ['rd' + (i + 1), el('span', { className: 'punct-sample', textContent: c }), 'A reading mark beside every character', 'Dấu đọc bên cạnh mỗi chữ']),
         ].map(([d, content, en, vi]) => {
             const b = btn(content, en, vi, () => { this.deco = this.deco === d ? '' : d; this.markDeco(); this.input.focus(); }, 'deco-btn');
             b.dataset.d = d;
@@ -890,8 +914,11 @@ const RubyBox = {
             el('div', { className: 'rt-row' }, this.input),
             el('div', { className: 'rt-row' }, this.shown),
             el('div', { className: 'rt-row' }, ...this.kindBtns, el('span', { className: 'sep' }), this.overBtn, this.underBtn, el('span', { className: 'sep' }), this.eachBtn),
-            head('Marks', 'Dấu son'),
-            el('div', { className: 'rt-row' }, ...this.decoBtns, el('span', { className: 'sep' }), ...this.punctBtns));
+            head('Emphasis', 'Nhấn mạnh'),
+            el('div', { className: 'rt-row' }, ...this.decoBtns.slice(0, 5)),
+            head('Marks', 'Dấu'),
+            el('div', { className: 'rt-row' }, ...this.decoBtns.slice(5)),
+            el('div', { className: 'rt-row' }, ...this.punctBtns));
         this.box.addEventListener('mousedown', e => { if (e.target !== this.input) e.preventDefault(); });
         document.body.append(this.box);
         document.addEventListener('pointerdown', e => { if (this.isOpen() && !this.box.contains(e.target)) this.close(false); });
@@ -1064,6 +1091,7 @@ const NomEditor = {
             rubyDelete,   // a deletion next to a ruby, before the input (a cell of QATT or PA in a ruby too)
             ...extra,   // the input (input.js) first: its keys before the keymaps
             imeKeys,
+            readMarks,
             keymap({
                 'Mod-z': undo, 'Shift-Mod-z': redo, 'Mod-y': redo,
                 'Mod-Alt-1': setHeading(1), 'Mod-Alt-2': setHeading(2), 'Mod-Alt-0': setBlockType(S.paragraph),
