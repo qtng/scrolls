@@ -784,7 +784,7 @@ const UI = {
         this.bH2 = btn(hIcon(2), 'Subheading', 'Tiêu đề phụ', cmd(setHeading(2)));
         this.bWari = btn(vi('Split', 'Chia'), 'Two-column text', 'Chữ hai dòng', cmd(toggleWari));
         this.bWari.classList.add('txt');
-        this.bRuby = btn(el('i', { className: 'fa-solid fa-message' }), 'Annotation (reading, marks, punctuation)', 'Chú thích (cách đọc, dấu, dấu câu)', () => RubyBox.open());
+        this.bRuby = btn(el('i', { className: 'fa-solid fa-message' }), 'Annotation (pronunciation, marks, punctuation)', 'Chú thích (cách phát âm, dấu, dấu câu)', () => RubyBox.open());
         // special characters: the button opens or closes the bar of special characters (app.js, event nomsymbols)
         this.bSym = btn(el('span', { className: 'sym-icon', textContent: '「」' }), 'Special characters', 'Ký tự đặc biệt', () => document.dispatchEvent(new CustomEvent('nomsymbols')));
         this.bSym.classList.add('sym-btn');
@@ -900,7 +900,7 @@ const RubyBox = {
             return b;
         });
         this.shown = el('span', { className: 'rt-preview input-group-text' });
-        this.eachBtn = btn(el('i', { className: 'fa-solid fa-wand-magic-sparkles' }), 'Fill in the readings from the dictionary (every character its own)', 'Điền cách đọc từ từ điển (từng chữ)', () => this.eachChar());
+        this.eachBtn = btn(el('i', { className: 'fa-solid fa-wand-magic-sparkles' }), 'Fill in the pronunciations from the dictionary (every character its own)', 'Điền cách phát âm từ từ điển (từng chữ)', () => this.eachChar());
         this.kindBtns = Scripts.KINDS.map(([k, label]) => {
             const b = btn(k === 'qn' ? vi('Text', 'Chữ') : label, { qn: 'Text (Quốc Ngữ)', pa: 'PA', qatt: 'QATT' }[k], { qn: 'Chữ (Quốc Ngữ)', pa: 'PA', qatt: 'QATT' }[k], () => this.setKind(k));
             b.dataset.k = k; b.setAttribute('role', 'radio');
