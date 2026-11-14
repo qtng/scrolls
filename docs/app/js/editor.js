@@ -871,8 +871,8 @@ const RubyBox = {
             return b;
         };
         this.input = el('input', { type: 'text', className: 'form-control form-control-sm rt-input', autocomplete: 'off' });
-        this.input.placeholder = 'Reading';
-        this.input.setAttribute('data-vi-placeholder', 'Cách đọc');
+        this.input.placeholder = 'Pronunciation';
+        this.input.setAttribute('data-vi-placeholder', 'Cách phát âm');
         this.input.addEventListener('keydown', e => {
             if (e.key === 'Enter' && !(this.ime && this.ime.visible)) { e.preventDefault(); this.apply(this.input.value); }
             else if (e.key === 'Escape' && !(this.ime && this.ime.visible)) { e.preventDefault(); this.close(true); }
@@ -910,7 +910,7 @@ const RubyBox = {
         const head = (en, viText) => { const h = vi(en, viText, 'div'); h.className = 'rt-head'; return h; };
         this.box = el('div', { className: 'scroll-ui ruby-box bg-light', hidden: true },
             el('div', { className: 'rt-row rt-title' }, (() => { const n = vi('Annotation', 'Chú thích'); n.className = 'rt-name'; return n; })(), this.del, this.ok),
-            el('div', { className: 'rt-row rt-headrow' }, head('Reading', 'Cách đọc'), this.eachBtn),
+            el('div', { className: 'rt-row rt-headrow' }, head('Pronunciation', 'Cách phát âm'), this.eachBtn),
             el('div', { className: 'rt-row rt-group' }, this.shown, this.input, this.kindGroup),
             el('div', { className: 'rt-sep' }),
             head('Emphasis', 'Nhấn mạnh'),
