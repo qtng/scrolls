@@ -915,8 +915,9 @@ const RubyBox = {
             el('div', { className: 'rt-row' }, this.shown),
             el('div', { className: 'rt-row' }, ...this.kindBtns, el('span', { className: 'sep' }), this.overBtn, this.underBtn, el('span', { className: 'sep' }), this.eachBtn),
             head('Marks', 'Dấu son'),
-            el('div', { className: 'rt-row' }, ...this.decoBtns.slice(0, 5), el('span', { className: 'sep' }), ...this.punctBtns),
-            el('div', { className: 'rt-row' }, ...this.decoBtns.slice(5)));
+            el('div', { className: 'rt-row' }, ...this.decoBtns.slice(0, 5)),
+            el('div', { className: 'rt-row' }, ...this.decoBtns.slice(5)),
+            el('div', { className: 'rt-row' }, ...this.punctBtns));
         this.box.addEventListener('mousedown', e => { if (e.target !== this.input) e.preventDefault(); });
         document.body.append(this.box);
         document.addEventListener('pointerdown', e => { if (this.isOpen() && !this.box.contains(e.target)) this.close(false); });
