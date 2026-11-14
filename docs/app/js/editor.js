@@ -718,7 +718,7 @@ const UI = {
         on(this.bWari, sel.empty ? (ws ? ws.on : !!wari.isInSet(state.storedMarks || $f.marks())) : state.doc.rangeHasMark(sel.from, sel.to, wari));
         const inRuby = sel.empty && rubyAt(state, sel.from);
         on(this.bRuby, inRuby || (!sel.empty && state.doc.rangeHasMark(sel.from, sel.to, ruby)));
-        this.bRuby.disabled = !(inRuby || (sel.empty && cellBefore(state, sel.from)) || (!sel.empty && $f.parent === sel.$to.parent && !state.doc.rangeHasMark(sel.from, sel.to, wari)));
+        this.bRuby.disabled = !(inRuby || (sel.empty && cellBefore(state, sel.from)) || (!sel.empty && $f.parent === sel.$to.parent && !state.doc.rangeHasMark(sel.from, sel.to, wari) && !!state.doc.textBetween(sel.from, sel.to).trim()));
         // the settings of the paragraphs in the selection: shown when they are the same, else the field is empty
         const dirs = new Set(), cols = new Set();
         state.doc.nodesBetween(sel.from, sel.to, node => {
@@ -796,6 +796,11 @@ const RubyBox = {
         else if (sel.$from.parent === sel.$to.parent && !state.doc.rangeHasMark(sel.from, sel.to, schema.marks.warichu)) {
             const r = rubyAt(state, sel.from);   // a selection inside one ruby edits it
             range = { from: sel.from, to: sel.to, mark: r && r.from <= sel.from && sel.to <= r.to ? r.mark : null };
+        }
+        if (range && !range.mark) {   // a new ruby: not on the spaces at the ends of the selection (a ruby on a space alone is squeezed into its width)
+            const t = state.doc.textBetween(range.from, range.to, '\n', '\n');
+            const lead = t.length - t.trimStart().length, trail = t.length - t.trimEnd().length;
+            range = t.trim() ? { ...range, from: range.from + lead, to: range.to - trail } : null;
         }
         if (!range) return;
         this.range = range;
