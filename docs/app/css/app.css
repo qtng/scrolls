@@ -132,9 +132,9 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .ProseMirror .rb { --bem: 1em; }
 .ProseMirror .rb .rt { position: absolute; font-size: .54em; line-height: 1; white-space: nowrap; pointer-events: none; user-select: none; opacity: .85; text-orientation: mixed; }
 .ProseMirror .grp.h .rb .rt { left: 50%; transform: translateX(-50%) scaleX(var(--rs, 1)); }
-.ProseMirror .grp.h .rb[data-side="over"] .rt { bottom: calc(100% + (1.16 - var(--rt-a, 1.16)) * .5 * var(--bem)); }
+.ProseMirror .grp.h .rb[data-side="over"] .rt { bottom: calc(100% + (1.16 - var(--rt-a, 1.16)) * .5 * var(--bem) - .12 * var(--bem)); }
 .ProseMirror .grp.v .rb .rt { top: 50%; transform: translateY(-50%) scaleY(var(--rs, 1)); }
-.ProseMirror .grp.v .rb[data-side="over"] .rt { left: calc(100% + (1.448 - var(--rt-bw, 1.448)) * .28 * var(--bem) - .14 * var(--bem)); }
+.ProseMirror .grp.v .rb[data-side="over"] .rt { left: calc(100% + (1.448 - var(--rt-bw, 1.448)) * .28 * var(--bem) - .08 * var(--bem)); }
 /* a reading of single cells: spread over the whole base, each cell in an equal share (editor.js sets the size) */
 .ProseMirror .grp .rb .rt.cells { display: flex; justify-content: center; align-items: center; transform: none; }
 .ProseMirror .rb .rt.cells > span { flex: none; inline-size: 1em; display: flex; justify-content: center; }
