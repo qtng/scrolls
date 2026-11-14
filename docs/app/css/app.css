@@ -160,14 +160,14 @@ button { font: inherit; color: inherit; cursor: pointer; }
    character: the lower right of it), horizontal ones in the lower left of the cell after it: both stand in the corner, whatever the size */
 .ProseMirror .rb[data-punct]::after { color: var(--mark-ink); font-weight: 700; line-height: 1; margin-inline-end: -1em; }
 .ProseMirror .rb[data-punct="stop"]::after { content: '\3002'; }
-.ProseMirror .rb[data-punct="comma"]::after { content: '\3001'; }
+.ProseMirror .rb[data-punct="comma"]::after { content: '\FE45'; font-size: .7em; }
 /* the middle of the mark on the lower right corner of the cell of the character (measured on the forms of QATT Pen: the vertical forms stand in the upper
    right, the horizontal ones in the lower left of their cell; the offsets in em of the mark) */
 .ProseMirror .rb[data-punct]::after { position: relative; }
 .ProseMirror .grp.v .rb[data-punct="stop"]::after { left: .186em; top: -.214em; }
-.ProseMirror .grp.v .rb[data-punct="comma"]::after { left: .204em; top: -.253em; }
+.ProseMirror .grp.v .rb[data-punct="comma"]::after { left: .757em; top: -.509em; }
 .ProseMirror .grp.h .rb[data-punct="stop"]::after { left: -.174em; top: .199em; }
-.ProseMirror .grp.h .rb[data-punct="comma"]::after { left: -.196em; top: .229em; }
+.ProseMirror .grp.h .rb[data-punct="comma"]::after { left: -.457em; top: .576em; }
 .ProseMirror .grp.h .rb .rt.cells { left: 0; right: 0; }
 .ProseMirror .grp.v .rb .rt.cells { top: 0; bottom: 0; }
 

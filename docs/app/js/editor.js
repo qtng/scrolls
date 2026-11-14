@@ -869,7 +869,7 @@ const RubyBox = {
             return b;
         });
         // the punctuation in cinnabar after the last character: one or none
-        this.punctBtns = [['stop', el('span', { className: 'punct-sample', textContent: '字。' }), 'A circle after the characters (end of a sentence)', 'Vòng tròn sau chữ (hết câu)'], ['comma', el('span', { className: 'punct-sample', textContent: '字、' }), 'A comma after the characters (a pause)', 'Dấu phẩy sau chữ (ngắt hơi)']].map(([d, content, en, vi]) => {
+        this.punctBtns = [['stop', el('span', { className: 'punct-sample', textContent: '字。' }), 'A circle after the characters (end of a sentence)', 'Vòng tròn sau chữ (hết câu)'], ['comma', el('span', { className: 'punct-sample', textContent: '字﹅' }), 'A comma after the characters (a pause)', 'Dấu phẩy sau chữ (ngắt hơi)']].map(([d, content, en, vi]) => {
             const b = btn(content, en, vi, () => { this.punct = this.punct === d ? '' : d; this.markDeco(); this.input.focus(); }, 'deco-btn');
             b.dataset.p = d;
             return b;
