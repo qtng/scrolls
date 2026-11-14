@@ -784,7 +784,7 @@ const UI = {
         this.bH2 = btn(hIcon(2), 'Subheading', 'Tiêu đề phụ', cmd(setHeading(2)));
         this.bWari = btn(vi('Split', 'Chia'), 'Two-column text', 'Chữ hai dòng', cmd(toggleWari));
         this.bWari.classList.add('txt');
-        this.bRuby = btn(el('i', { className: 'fa-solid fa-message' }), 'Annotation (reading, marks, punctuation)', 'Chú thích (cách đọc, dấu, dấu câu)', () => RubyBox.open());
+        this.bRuby = btn(el('i', { className: 'fa-solid fa-message' }), 'Annotation (pronunciation, marks, punctuation)', 'Chú thích (cách phát âm, dấu, dấu câu)', () => RubyBox.open());
         // special characters: the button opens or closes the bar of special characters (app.js, event nomsymbols)
         this.bSym = btn(el('span', { className: 'sym-icon', textContent: '「」' }), 'Special characters', 'Ký tự đặc biệt', () => document.dispatchEvent(new CustomEvent('nomsymbols')));
         this.bSym.classList.add('sym-btn');
@@ -871,8 +871,8 @@ const RubyBox = {
             return b;
         };
         this.input = el('input', { type: 'text', className: 'form-control form-control-sm rt-input', autocomplete: 'off' });
-        this.input.placeholder = 'Reading';
-        this.input.setAttribute('data-vi-placeholder', 'Cách đọc');
+        this.input.placeholder = 'Pronunciation';
+        this.input.setAttribute('data-vi-placeholder', 'Cách phát âm');
         this.input.addEventListener('keydown', e => {
             if (e.key === 'Enter' && !(this.ime && this.ime.visible)) { e.preventDefault(); this.apply(this.input.value); }
             else if (e.key === 'Escape' && !(this.ime && this.ime.visible)) { e.preventDefault(); this.close(true); }
@@ -882,7 +882,7 @@ const RubyBox = {
         this.del = btn(el('i', { className: 'fa-solid fa-trash' }), 'Remove the annotation', 'Bỏ chú thích', () => { this.deco = ''; this.rd = ''; this.punct = ''; this.apply(''); });
         // the marks in cinnabar beside the characters: one of them or none (a second tap takes it away)
         this.decoBtns = [
-            ['line', el('span', { textContent: 'Line', 'data-vi': 'Vạch' }), 'Cinnabar line beside the characters (read together)', 'Vạch son bên cạnh chữ (đọc liền)'],
+            ['line', vi('Line', 'Vạch'), 'Cinnabar line beside the characters (read together)', 'Vạch son bên cạnh chữ (đọc liền)'],
             ['circle', '○', 'A circle beside every character', 'Vòng tròn bên cạnh mỗi chữ'],
             ['dot', '●', 'A dot beside every character', 'Chấm bên cạnh mỗi chữ'],
             ['sesame', '﹅', 'A sesame dot beside every character', 'Chấm vừng bên cạnh mỗi chữ'],
@@ -900,17 +900,17 @@ const RubyBox = {
             return b;
         });
         this.shown = el('span', { className: 'rt-preview input-group-text' });
-        this.eachBtn = btn(el('i', { className: 'fa-solid fa-wand-magic-sparkles' }), 'Fill in the readings from the dictionary (every character its own)', 'Điền cách đọc từ từ điển (từng chữ)', () => this.eachChar());
+        this.eachBtn = btn(el('i', { className: 'fa-solid fa-wand-magic-sparkles' }), 'Fill in the pronunciations from the dictionary (every character its own)', 'Điền cách phát âm từ từ điển (từng chữ)', () => this.eachChar());
         this.kindBtns = Scripts.KINDS.map(([k, label]) => {
-            const b = btn(k === 'qn' ? el('span', { textContent: 'Text', 'data-vi': 'Chữ' }) : label, { qn: 'Text (Quốc Ngữ)', pa: 'PA', qatt: 'QATT' }[k], { qn: 'Chữ (Quốc Ngữ)', pa: 'PA', qatt: 'QATT' }[k], () => this.setKind(k));
+            const b = btn(k === 'qn' ? vi('Text', 'Chữ') : label, { qn: 'Text (Quốc Ngữ)', pa: 'PA', qatt: 'QATT' }[k], { qn: 'Chữ (Quốc Ngữ)', pa: 'PA', qatt: 'QATT' }[k], () => this.setKind(k));
             b.dataset.k = k; b.setAttribute('role', 'radio');
             return b;
         });
         this.kindGroup = el('div', { className: 'rt-radios', role: 'radiogroup' }, ...this.kindBtns);
-        const head = (en, vi) => el('div', { className: 'rt-head', textContent: en, 'data-vi': vi });
+        const head = (en, viText) => { const h = vi(en, viText, 'div'); h.className = 'rt-head'; return h; };
         this.box = el('div', { className: 'scroll-ui ruby-box bg-light', hidden: true },
-            el('div', { className: 'rt-row rt-title' }, el('span', { className: 'rt-name', textContent: 'Annotation', 'data-vi': 'Chú thích' }), this.del, this.ok),
-            el('div', { className: 'rt-row rt-headrow' }, head('Reading', 'Cách đọc'), this.eachBtn),
+            el('div', { className: 'rt-row rt-title' }, (() => { const n = vi('Annotation', 'Chú thích'); n.className = 'rt-name'; return n; })(), this.del, this.ok),
+            el('div', { className: 'rt-row rt-headrow' }, head('Pronunciation', 'Cách phát âm'), this.eachBtn),
             el('div', { className: 'rt-row rt-group' }, this.shown, this.input, this.kindGroup),
             el('div', { className: 'rt-sep' }),
             head('Emphasis', 'Nhấn mạnh'),
