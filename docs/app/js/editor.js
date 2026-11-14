@@ -630,18 +630,6 @@ function rubyAt(state, pos) {
     return found;
 }
 
-// ---------------------------------------------------------------- placeholder
-const placeholderPlugin = new Plugin({
-    props: {
-        decorations(state) {
-            const doc = state.doc;
-            const sec = doc.firstChild, grp = sec && sec.firstChild, para = grp && grp.firstChild;
-            if (doc.childCount !== 1 || sec.childCount !== 1 || grp.type !== S.group || grp.childCount !== 1 || para.content.size) return null;
-            return DecorationSet.create(doc, [Decoration.node(2, 2 + para.nodeSize, { class: 'is-empty', 'data-placeholder': T('Write…', 'Viết…') })]);
-        },
-    },
-});
-
 // ---------------------------------------------------------------- the toolbar (the format bar of the app)
 const UI = {
     view: null,
@@ -941,7 +929,6 @@ const NomEditor = {
             history(),
             dropCursor(),
             normalizePlugin,
-            placeholderPlugin,
             layoutPlugin,
             uiPlugin,
             wariPlugin,

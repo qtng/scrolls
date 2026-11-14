@@ -503,15 +503,15 @@ window.notesApp = { store, ready, flush() } is for the tests.
   const MAX_CHARS = 23;
   const pageWidth = () => Math.min(MAX_CHARS, Math.round(room() / BASE * 10) / 10);   // in characters of 32 px, at most 23
   // Two sizes: the zoom (reading only, the slider of the title bar, not kept) scales the page and its text together; the font size of the
-  // document (editing, format.textSize: the number of the list 14 … 144 that people know from a word processor, 24 by default; kept and synced) scales
-  // only the text in its page of fixed width, so that more or less fits on a page. The number is only a name: the unit (--unit) is the size of a
-  // character of 24, the page is format.width units wide, the text is textSize / 24 of a unit. (Later a size of
+  // document (editing, format.textSize: 14 … 144 px, 24 by default; kept and synced) scales only the text in its page of
+  // fixed width, so that more or less fits on a page. The unit (--unit) is 32 px at 100 % (more on a wide screen), the page is format.width units
+  // wide, the text is textSize / 32 of a unit, i.e. textSize px. (Later a size of
   // a paragraph or a character can be relative to the text of the document, in em.)
   let zoom = 100;
   function applySize(relayout = true) {   // a zoom alone needs no new layout: the layout is in em
     const doc = state.current, w = doc && doc.format && doc.format.width > 0 ? doc.format.width : pageWidth();
     // the document fills the width of the screen: smaller where it does not fit, larger where there is room, but at most twice its size
-    const fit = Math.min(2, room() / (w * BASE)), unit = BASE * fit * zoom / 100, scale = textSizeOf(doc) / 24;
+    const fit = Math.min(2, room() / (w * BASE)), unit = BASE * fit * zoom / 100, scale = textSizeOf(doc) / BASE;
     document.documentElement.style.setProperty('--page-em', String(w));
     document.documentElement.style.setProperty('--unit', unit.toFixed(2) + 'px');
     document.documentElement.style.setProperty('--doc-size', (unit * scale).toFixed(2) + 'px');
@@ -598,20 +598,16 @@ window.notesApp = { store, ready, flush() } is for the tests.
       later((next && frame ? next.value : zoom) * Math.exp(-e.deltaY * 0.01), { x: e.clientX, y: e.clientY });
     }, { passive: false });
   }
-  // the font size of the document
-  // the font size of the document: one of the sizes of the list (a document of before keeps its percentage as the nearest size)
+  // the font size of the document: one of the sizes of the list, in px (24 by default)
   const TEXT_SIZES = [14, 16, 18, 20, 24, 28, 32, 36, 48, 72, 96, 144];
-  const nearestSize = n => TEXT_SIZES.reduce((a, b) => (Math.abs(b - n) < Math.abs(a - n) ? b : a));
   function textSizeOf(doc) {
     const f = doc && doc.format || {};
-    if (TEXT_SIZES.includes(f.textSize)) return f.textSize;
-    if (Number.isFinite(f.fontSize)) return nearestSize(24 * f.fontSize / 100);
-    return 24;
+    return TEXT_SIZES.includes(f.textSize) ? f.textSize : 24;
   }
   const setFontSize = (value, user) => {
-    const v = nearestSize(Number(value) || 24);
+    const n = Number(value), v = TEXT_SIZES.includes(n) ? n : 24;
     $('set-size').value = String(v);
-    if (user) { if (state.current && state.current.format) delete state.current.format.fontSize; keepFormat('textSize', v); }
+    if (user) keepFormat('textSize', v);
     applySize();
   };
   $('set-size').addEventListener('change', () => { setFontSize($('set-size').value, true); NomEditor.focus(); });
