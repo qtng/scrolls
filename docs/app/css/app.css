@@ -152,13 +152,12 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .ProseMirror .rb[data-deco="sesame"] > .rb-b { text-emphasis-style: filled sesame; }
 .ProseMirror .rb[data-deco] > .rb-b { text-emphasis-color: var(--mark-ink); text-emphasis-position: over right; }
 .ProseMirror .rb.has-rt[data-side="over"][data-deco] > .rb-b { text-emphasis-position: under left; }
-/* the punctuation after the last character, in its corner, taking no room: positioned absolutely without insets it stays where it would follow
-   the last character (also behind the end of a column or line) and takes neither the line nor the dots of the base; margins move it */
-.ProseMirror .rb[data-punct] > .rb-b::after { position: absolute; color: var(--mark-ink); font-size: 1em; line-height: 1; font-weight: 700; }
-.ProseMirror .rb[data-punct="stop"] > .rb-b::after { content: '\3002'; }
-.ProseMirror .rb[data-punct="comma"] > .rb-b::after { content: '\3001'; }
-.ProseMirror .grp.v .rb[data-punct] > .rb-b::after { margin-block-start: var(--punct-v-b, -.3em); margin-inline-start: var(--punct-v-i, -.8em); }
-.ProseMirror .grp.h .rb[data-punct] > .rb-b::after { margin-block-start: var(--punct-h-b, .68em); margin-inline-start: var(--punct-h-i, -.2em); }
+/* the punctuation after the last character, in the corner of it: 。 and 、 are set as text after the characters (outside the line and the marks of .rb-b),
+   and take no room (a negative margin of their own advance). The fonts have vertical forms for them (the upper right of the cell, which lies below the last
+   character: the lower right of it), horizontal ones in the lower left of the cell after it: both stand in the corner, whatever the size */
+.ProseMirror .rb[data-punct]::after { color: var(--mark-ink); font-weight: 700; line-height: 1; margin-inline-end: -1em; }
+.ProseMirror .rb[data-punct="stop"]::after { content: '\3002'; }
+.ProseMirror .rb[data-punct="comma"]::after { content: '\3001'; }
 .ProseMirror .grp.h .rb .rt.cells { left: 0; right: 0; }
 .ProseMirror .grp.v .rb .rt.cells { top: 0; bottom: 0; }
 
