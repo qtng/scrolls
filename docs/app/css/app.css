@@ -189,7 +189,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .more[aria-expanded="true"] { color: var(--accent); border-color: var(--accent); }
 .variant.nom, .nom-more button { font-family: var(--doc-font), var(--nom), serif; }
 /* PA (slot 2): tinted, QATT (slot 1) plain; the first Chữ Nôm candidate (the one a space will take) is filled in the accent colour */
-.variant.pa { background: color-mix(in srgb, var(--accent) 26%, var(--bg)); border-color: #f0932b; }   /* an orange edge */
+.variant.pa { background: color-mix(in srgb, var(--accent) 26%, var(--bg)); border-color: color-mix(in srgb, #f0932b 50%, transparent); }   /* a pale orange edge */
 .variant.first { background: var(--accent); color: #fff; border-color: var(--accent); }
 .nom-more { position: absolute; z-index: 5; left: .5rem; right: .5rem; bottom: 100%; max-height: 40vh; max-height: 40dvh; overflow-y: auto; display: grid; grid-template-columns: repeat(auto-fill, minmax(48px, 1fr)); gap: .3rem; padding: .4rem;
   background: rgba(58, 51, 42, .9); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 -6px 18px rgba(0, 0, 0, .5); }
