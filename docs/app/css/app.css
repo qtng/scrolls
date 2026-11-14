@@ -125,13 +125,18 @@ button { font: inherit; color: inherit; cursor: pointer; }
 /* ruby: the base keeps its cell; the reading sits beside it (horizontal: over / under, vertical: right / left), narrowed along the line by editor.js (--rs) */
 .ProseMirror .rb { position: relative; }
 .ProseMirror .grp p:has(.rb), .ProseMirror .grp h1:has(.rb), .ProseMirror .grp h2:has(.rb) { line-height: 2.2; }
+/* the box of a character differs with the font (--rt-a, --rt-d, --rt-bw: its content area in em, measured by editor.js; the reference is QATT Pen: 1.16 above,
+   .288 below the baseline, 1.448 wide), the ink in it does not move as much: the reading and the line are set back by what the box lacks (the factors from
+   measuring the fonts); --bem is the size of the base in px, whatever the size of the reading */
+@property --bem { syntax: '<length>'; inherits: true; initial-value: 0px; }
+.ProseMirror .rb { --bem: 1em; }
 .ProseMirror .rb .rt { position: absolute; font-size: .54em; line-height: 1; white-space: nowrap; pointer-events: none; user-select: none; opacity: .85; text-orientation: mixed; }
 .ProseMirror .grp.h .rb .rt { left: 50%; transform: translateX(-50%) scaleX(var(--rs, 1)); }
-.ProseMirror .grp.h .rb[data-side="over"] .rt { bottom: 100%; }
-.ProseMirror .grp.h .rb[data-side="under"] .rt { top: 100%; }
+.ProseMirror .grp.h .rb[data-side="over"] .rt { bottom: calc(100% + (1.16 - var(--rt-a, 1.16)) * .5 * var(--bem)); }
+.ProseMirror .grp.h .rb[data-side="under"] .rt { top: calc(100% + (.288 - var(--rt-d, .288)) * .5 * var(--bem)); }
 .ProseMirror .grp.v .rb .rt { top: 50%; transform: translateY(-50%) scaleY(var(--rs, 1)); }
-.ProseMirror .grp.v .rb[data-side="over"] .rt { left: 100%; }
-.ProseMirror .grp.v .rb[data-side="under"] .rt { right: 100%; }
+.ProseMirror .grp.v .rb[data-side="over"] .rt { left: calc(100% + (1.448 - var(--rt-bw, 1.448)) * .28 * var(--bem)); }
+.ProseMirror .grp.v .rb[data-side="under"] .rt { right: calc(100% + (1.448 - var(--rt-bw, 1.448)) * .28 * var(--bem)); }
 /* a reading of single cells: spread over the whole base, each cell in an equal share (editor.js sets the size) */
 .ProseMirror .grp .rb .rt.cells { display: flex; justify-content: center; align-items: center; transform: none; }
 .ProseMirror .rb .rt.cells > span { flex: none; inline-size: 1em; display: flex; justify-content: center; }
@@ -139,7 +144,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 /* the cinnabar marks beside the base (editor.js, deco): text decorations follow the characters over the end of a column or line, and the reading
    (positioned absolutely) does not take them. The line of characters read together (a name): vertical on the right, horizontal over them */
 .ProseMirror .rb[data-deco="line"] > .rb-b { text-decoration-line: underline; text-decoration-color: var(--mark-ink); text-decoration-thickness: .07em; text-decoration-skip-ink: none; }
-.ProseMirror .grp.v .rb[data-deco="line"] > .rb-b { text-underline-position: right; text-underline-offset: var(--line-v, .06em); }
+.ProseMirror .grp.v .rb[data-deco="line"] > .rb-b { text-underline-position: right; text-underline-offset: calc(.06em + (1.448 - var(--rt-bw, 1.448)) * .19em); }
 .ProseMirror .grp.h .rb[data-deco="line"] > .rb-b { text-underline-position: auto; text-underline-offset: var(--line-h, -1.02em); }
 /* a circle, dot or sesame dot beside every character (a passage stressed): on the right (horizontal: over), on the other side when a reading is there */
 .ProseMirror .rb[data-deco="circle"] > .rb-b { text-emphasis-style: open circle; }
