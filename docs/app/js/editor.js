@@ -537,10 +537,17 @@ class Layout {
             const bands = Math.max(1, Math.floor((bottom - top - 1) / inf.pitch) + 1);
             sec.style.height = ((bands * inf.pitch - inf.gap + inf.pad.t + inf.pad.b) / inf.em).toFixed(4) + 'em';
         }
-        // ruby longer than its base is narrowed (the base keeps its cell)
+        // ruby: a reading of single cells (Chữ Nôm, PA, QATT) is spread evenly over its base, each cell in its share of the base (two cells on one
+        // character at a quarter and three quarters), smaller when they do not fit; a Latin reading (Quốc Ngữ) longer than its base is narrowed
         for (const rb of view.dom.querySelectorAll('.rb')) {
             const base = rb.firstElementChild, rt = rb.lastElementChild;
             if (!base || !rt || !rt.textContent) continue;
+            if (rt.classList.contains('cells')) {
+                const share = cellsOf(base.textContent).length / Math.max(1, rt.children.length);
+                const size = Math.min(0.55, 0.9 * share).toFixed(3) + 'em';
+                if (rt.style.fontSize !== size) rt.style.fontSize = size;
+                continue;
+            }
             const v = !!rb.closest('.grp.v'), r = base.getBoundingClientRect();
             const baseLen = v ? r.height : r.width, rtLen = v ? rt.offsetHeight : rt.offsetWidth;
             const allowed = baseLen + 0.2 * parseFloat(getComputedStyle(base).fontSize);
@@ -554,7 +561,12 @@ class Layout {
 
 // ---------------------------------------------------------------- ruby
 function rubyView(mark) {
-    const dom = el('span', { className: 'rb' }), contentDOM = el('span', { className: 'rb-b' }), rt = el('span', { className: 'rt', textContent: mark.attrs.rt });
+    const dom = el('span', { className: 'rb' }), contentDOM = el('span', { className: 'rb-b' }), rt = el('span', { className: 'rt' });
+    const text = mark.attrs.rt || '';
+    if (text.trim() && !/\p{Script=Latin}/u.test(text)) {   // single cells (the spaces between them dropped): each in a box of its own, spread over the base (layout above)
+        rt.classList.add('cells');
+        for (const c of cellsOf(text)) if (c.trim()) rt.append(el('span', { textContent: c }));
+    } else rt.textContent = text;
     dom.dataset.side = mark.attrs.side;
     rt.contentEditable = 'false';
     dom.append(contentDOM, rt);
@@ -630,6 +642,18 @@ function rubyAt(state, pos) {
     return found;
 }
 
+// the visible cell (a character, a QATT or PA cell) just before the caret, not in two-column text: the base of a new ruby
+function cellBefore(state, pos) {
+    const $pos = state.doc.resolve(pos), start = $pos.start();
+    if (!$pos.parent.inlineContent || pos <= start) return null;
+    const before = $pos.nodeBefore;
+    if (!before || !before.isText || schema.marks.warichu.isInSet(before.marks)) return null;
+    const cells = cellsOf(state.doc.textBetween(Math.max(start, pos - 16), pos));
+    const last = cells[cells.length - 1];
+    if (!last || !/[^\s\p{P}]/u.test(last)) return null;
+    return { from: pos - last.length, to: pos, mark: null };
+}
+
 // ---------------------------------------------------------------- the toolbar (the format bar of the app)
 const UI = {
     view: null,
@@ -694,7 +718,7 @@ const UI = {
         on(this.bWari, sel.empty ? (ws ? ws.on : !!wari.isInSet(state.storedMarks || $f.marks())) : state.doc.rangeHasMark(sel.from, sel.to, wari));
         const inRuby = sel.empty && rubyAt(state, sel.from);
         on(this.bRuby, inRuby || (!sel.empty && state.doc.rangeHasMark(sel.from, sel.to, ruby)));
-        this.bRuby.disabled = !(inRuby || (!sel.empty && $f.parent === sel.$to.parent && !state.doc.rangeHasMark(sel.from, sel.to, wari)));
+        this.bRuby.disabled = !(inRuby || (sel.empty && cellBefore(state, sel.from)) || (!sel.empty && $f.parent === sel.$to.parent && !state.doc.rangeHasMark(sel.from, sel.to, wari)));
         // the settings of the paragraphs in the selection: shown when they are the same, else the field is empty
         const dirs = new Set(), cols = new Set();
         state.doc.nodesBetween(sel.from, sel.to, node => {
@@ -768,7 +792,7 @@ const RubyBox = {
     async open() {
         const { state } = this.view, sel = state.selection;
         let range;
-        if (sel.empty) range = rubyAt(state, sel.from);
+        if (sel.empty) range = rubyAt(state, sel.from) || cellBefore(state, sel.from);
         else if (sel.$from.parent === sel.$to.parent && !state.doc.rangeHasMark(sel.from, sel.to, schema.marks.warichu)) {
             const r = rubyAt(state, sel.from);   // a selection inside one ruby edits it
             range = { from: sel.from, to: sel.to, mark: r && r.from <= sel.from && sel.to <= r.to ? r.mark : null };
