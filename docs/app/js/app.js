@@ -189,7 +189,23 @@ window.notesApp = { store, ready, flush() } is for the tests.
     setEditing(fresh, false);
     if (fresh) NomEditor.focus();
   }
+  // the open document is replaced by its newer version from the account (sync): the mode and the place stay
+  function reload(doc) {
+    const editing = NomEditor.editable, top = $('field').scrollTop, focused = editing && document.activeElement && document.activeElement.closest('.ProseMirror');
+    const caret = NomEditor.caret();
+    const formatChanged = JSON.stringify(state.current.format || null) !== JSON.stringify(doc.format || null);
+    state.current = { ...doc }; state.inStore = true; state.dirty = false;
+    applyStyle(doc);
+    if (formatChanged) applyFormat(doc);
+    if (!NomEditor.open(doc.content || null, edited)) snack('Parts of this document could not be read', 'Không đọc được một phần của ghi chú này', { sticky: true });
+    setEditing(editing, false);
+    showTitle();
+    $('field').scrollTop = top;
+    if (editing) NomEditor.setCaret(caret);   // about the same place (the text before it may have changed)
+    if (focused) NomEditor.focus();
+  }
   async function showList() {
+    $('conflict').hidden = true; conflictDoc = null;   // left without a choice: the newer version wins at the next sync
     await save();
     state.current = null; state.shared = false; $('view-editor').classList.remove('shared');
     closeMenu();
@@ -209,6 +225,8 @@ window.notesApp = { store, ready, flush() } is for the tests.
     const doc = state.docs.find(d => d.id === id);
     if (!doc) { history.replaceState(null, '', '#/'); return showList(); }
     showEditor({ ...doc }, false);
+    lastActive = Date.now();
+    if (app.ready) sync();   // the account may have a newer version of it
   }
   // a link: the document is loaded by its code and shown for reading (the logo leads to the list when signed in, else to the homepage)
   async function showShared(code) {
@@ -674,7 +692,7 @@ window.notesApp = { store, ready, flush() } is for the tests.
     await saving;   // a save that is already running ends before the document is removed
     if (wasStored) {
       try { await state.store.remove(doc.id); } catch (e) { warnUnsaved(); }
-      if (doc.synced) DocsSync.forget(doc.id);
+      if (doc.synced) DocsSync.forget(doc.id, doc.synced);
       state.docs = state.docs.filter(d => d.id !== doc.id);
     }
     if (/\S/.test(snapshot.text) || wasStored) { snack('Deleted', 'Đã xóa', { undo: true }); deleted = snapshot; }
@@ -691,27 +709,104 @@ window.notesApp = { store, ready, flush() } is for the tests.
   });
 
   // ----- the account: signed in, the documents are synced with it (sync.js) -----
-  let syncing = false, syncTimer = 0;
-  function syncSoon() { if (!DocsSync.user) return; clearTimeout(syncTimer); syncTimer = setTimeout(sync, 4000); }
+  let syncing = false, syncTimer = 0, againQueued = false;
+  // a change goes to the account 4 s after the last save, and at the latest 30 s after the first change not yet sent (also while typing on)
+  let firstUnsent = 0;
+  function syncSoon() {
+    if (!DocsSync.user) return;
+    const now = Date.now();
+    if (!firstUnsent) firstUnsent = now;
+    clearTimeout(syncTimer);
+    syncTimer = setTimeout(sync, Math.max(0, Math.min(4000, firstUnsent + 30000 - now)));
+  }
   async function sync(byHand) {
-    if (!DocsSync.user || syncing) return;
+    if (!DocsSync.user) return;
+    if (syncing) { againQueued = true; return; }   // once more when this one ends
     syncing = true;
     if (byHand) snack('Syncing…', 'Đang đồng bộ…', { sticky: true });
     try {
       await save();
-      const started = Date.now();
-      const r = await DocsSync.run(state.docs, state.store, { skip: state.current && state.current.id });
+      firstUnsent = 0; clearTimeout(syncTimer);
+      const started = Date.now(), open = state.current && !state.shared ? state.current : null, openAt = open && open.updated;
+      const r = await DocsSync.run(state.docs, state.store, { skip: open && open.id });
       const cur = new Map(state.docs.map(d => [d.id, d]));   // what was typed or made while the sync ran stays (the sync worked on the documents as they were at its start)
       state.docs = r.docs.map(d => { const c = cur.get(d.id); return c && c.updated > d.updated ? { ...c, synced: d.synced } : d; })
         .concat(state.docs.filter(c => !r.docs.some(d => d.id === c.id) && c.created >= started));
       if (state.current) { const d = r.docs.find(x => x.id === state.current.id); if (d) state.current.synced = d.synced; }
+      // the open document is newer in the account: unchanged here (also while the sync ran) it is taken, changed here too the user chooses
+      if (r.incoming && open && state.current === open) {
+        if (!r.conflict && open.updated === openAt && !state.dirty) await takeIncoming(r.incoming);
+        else askConflict(r.incoming);
+      }
       if (!state.current && r.changed) renderList();
       if (byHand) snack('Synced', 'Đã đồng bộ');
     } catch (e) {
       console.error('Sync failed:', e);
       if (byHand) snack('Could not sync (offline?)', 'Không đồng bộ được (đang ngoại tuyến?)');
-    } finally { syncing = false; }
+    } finally {
+      syncing = false;
+      if (againQueued) { againQueued = false; sync(); }
+    }
   }
+  // the newer version of the open document from the account replaces it
+  async function takeIncoming(doc) {
+    clearTimeout(saveTimer); saveTimer = null; state.dirty = false;
+    await saving;   // a save of what was typed meanwhile ends before the newer version is kept
+    await DocsSync.take(doc, state.store);
+    const i = state.docs.findIndex(d => d.id === doc.id);
+    if (i < 0) state.docs.push(doc); else state.docs[i] = doc;
+    reload(doc);
+  }
+  // a conflict of the open document: the version of the other device, the own one (saved over the other), or the own one as a new note
+  let conflictDoc = null;
+  const stamp = ms => new Date(ms).toLocaleString(Lang.current === 'vi' ? 'vi-VN' : undefined, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  function askConflict(remote) {
+    conflictDoc = remote;   // asked already: the newest version of the other device counts
+    $('conflict-theirs-time').textContent = stamp(remote.updated);
+    $('conflict-mine-time').textContent = stamp(state.current.updated);
+    if (!$('conflict').hidden) return;
+    if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+    $('conflict').hidden = false;
+  }
+  const endConflict = () => {
+    $('conflict').hidden = true;
+    const d = conflictDoc; conflictDoc = null;
+    return d && state.current && state.current.id === d.id && !state.shared ? d : null;
+  };
+  $('conflict-theirs').addEventListener('click', async () => { const d = endConflict(); if (d) await takeIncoming(d); });
+  $('conflict-mine').addEventListener('click', async () => {
+    const d = endConflict(); if (!d) return;
+    DocsSync.mark(d.id, d.synced);   // the own version is based on the one of the other device now: it is saved over it
+    state.current.synced = d.synced;
+    state.dirty = true; await save();
+    if (state.current && state.current.updated <= d.synced) {   // a clock behind the other device: the own version must still count as the newer one
+      state.current.updated = d.synced + 1;
+      const copy = { ...state.current };
+      await state.store.put(copy);
+      const i = state.docs.findIndex(x => x.id === copy.id); if (i >= 0) state.docs[i] = copy;
+    }
+    sync();
+  });
+  $('conflict-copy').addEventListener('click', async () => {
+    const d = endConflict(); if (!d) return;
+    const now = Date.now(), text = NomEditor.text();
+    const copy = { ...state.current, content: NomEditor.json(), text, id: newId(), title: DocsCore.title(text, state.current.title) + ' (' + Lang.t('copy', 'bản sao') + ')', created: now, updated: now, synced: 0 };
+    try { await state.store.put(copy); } catch (e) { warnUnsaved(); }
+    state.docs.push(copy);
+    await takeIncoming(d);
+    snack('Your version was kept as a copy', 'Phiên bản của bạn đã được lưu thành bản sao');
+    syncSoon();
+  });
+  // the first key, tap or click in the document after a pause of 30 s asks the account for a newer version at once (another device may have changed it)
+  const PAUSE = 30000;
+  let lastActive = Date.now();
+  const activity = () => {
+    const now = Date.now();
+    if (now - lastActive > PAUSE && state.current && !state.shared) sync();
+    lastActive = now;
+  };
+  for (const type of ['keydown', 'pointerdown', 'beforeinput']) $('editor').addEventListener(type, activity, true);
+
   function renderAccount() {
     const u = DocsSync.user, label = $('account-label');
     if (u) { label.setAttribute('data-vi', 'Đăng xuất (' + (u.email || '') + ')'); label.textContent = 'Sign out (' + (u.email || '') + ')'; }

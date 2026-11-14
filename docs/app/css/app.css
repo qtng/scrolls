@@ -242,6 +242,11 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .fontinfo-note { margin-top: .5rem; font-size: .75rem; color: var(--muted); }
 .clip-actions { display: flex; gap: .5rem; padding: .5rem; border-top: 1px solid var(--line); }
 .clip-actions button { flex: 1 1 0; display: flex; align-items: center; justify-content: center; gap: .5rem; min-height: 48px; border: 1px solid var(--line); border-radius: 12px; background: var(--bg); }
+.conflict-body { flex-direction: column; gap: .5rem; }
+.conflict-body p { margin: 0; }
+.conflict-actions { flex-direction: column; }
+.conflict-actions button { flex: none; }
+#conflict-theirs { border-color: var(--accent); }
 
 /* the title bar of the editor: back, the direction, the size, then edit, style, menu */
 .appbar .grow { flex: 1; }
