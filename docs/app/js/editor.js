@@ -328,6 +328,26 @@ const measure = {
         }
         return this.cache.get(key);
     },
+    // the content area of a character in the font: how far it reaches above and below the baseline, in em ({ a, d }; the sum is the width of a
+    // column in vertical text). Fonts differ (QATT Pen 1.16 and .288, others .88 and .12): the annotations are set from these numbers (--rt-a, --rt-d,
+    // --rt-bw in css), not from the edge of the box, so that they stand the same at every font
+    box(cs) {
+        const font = `${cs.fontStyle} ${cs.fontWeight} 100px ${cs.fontFamily}`, key = 'box\n' + font;
+        if (!this.cache.has(key)) {
+            const pr = el('div', { ariaHidden: 'true' });
+            pr.style.cssText = 'position:absolute;left:0;top:0;visibility:hidden;white-space:pre;writing-mode:horizontal-tb;line-height:normal;';
+            pr.style.font = font;
+            const mk = el('i'), sp = el('span');
+            mk.style.cssText = 'display:inline-block;width:0;height:0;vertical-align:baseline;';
+            sp.append('\u9ad8', mk);
+            pr.append(sp);
+            document.body.append(pr);
+            const r = sp.getBoundingClientRect(), base = mk.getBoundingClientRect().top;
+            this.cache.set(key, { a: (base - r.top) / 100, d: (r.bottom - base) / 100 });
+            pr.remove();
+        }
+        return this.cache.get(key);
+    },
     // horizontal: how far the middle of the ink of the two small lines lies below the middle of the ink of the line, in px. The baselines are
     // measured in the DOM (a marker of no size on each baseline), the ink above the baseline in a canvas (the middle of 國 in the font)
     segShiftH(cs) {
@@ -497,6 +517,8 @@ class Layout {
         if (view.composing) return;   // after the composition (compositionend)
         const sections = [...view.dom.querySelectorAll('div.grp')];   // the groups (a vertical one is laid out in bands)
         const info = new Map();
+        const box = measure.box(getComputedStyle(view.dom));   // the annotations follow the content area of the font
+        for (const [name, value] of [['--rt-a', box.a], ['--rt-d', box.d], ['--rt-bw', box.a + box.d]]) { const t = value.toFixed(3); if (view.dom.style.getPropertyValue(name) !== t) view.dom.style.setProperty(name, t); }
         for (const sec of sections) {
             const v = sec.dataset.dir === 'v', cs = getComputedStyle(sec), em = parseFloat(cs.fontSize);
             const gap = v ? parseFloat(cs.columnGap) || 0 : 0;
