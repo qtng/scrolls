@@ -5,18 +5,19 @@ some seconds after a change and by hand) and takes the newer side of each docume
 lists), content (the ProseMirror JSON), settings: { app: 'nom-notes', updated, created, text, title?, format?, style? } (`updated` in milliseconds is the
 version that is compared). Rows of the first editor of Scrolls (no settings.app) are taken over as they are (their content is converted by the editor).
 Both sides changed since the last sync: the newer one wins, the other one is dropped (no copies). Just before a document is saved in the account
-its row there is read again: if another device saved a newer version meanwhile, that one is loaded and nothing is saved. The open document is not replaced under the hands of
-the user: run() hands its newer version to the app, which takes it only if nothing was typed meanwhile (else the next sync uploads what was typed).
+its row there is read again: if another device saved a newer version meanwhile, that one is loaded and nothing is saved. The open document is not replaced
+under the hands of the user: run() hands its newer version to the app (incoming); unchanged here, the app takes it; changed here too (conflict), the user
+chooses: the version of the other device, his own, or his own as a copy.
 A document deleted here is deleted in the account at the next sync (its id and version wait in localStorage "nomNotesDeleted"), unless it was changed
 there after the version known here (then it comes back); one deleted in the account (by another device) goes here too if it had been synced before and
 was not changed here since (else it is uploaded again).
 
   await DocsSync.init()          the user (signed in for real) or null
   DocsSync.user, DocsSync.service the SupabaseService (js/supabase.js of qatt.org) for the login dialog
-  await DocsSync.run(local, store, { skip, prefer })   local: the documents of the browser; store: db.js; skip: the id of the open document (its newer version
-                                 comes as incoming); prefer: the same id after a pause (a newer version there wins even over what was typed since the last sync)
-                                 returns { docs, changed, incoming }: the documents after the sync, whether any changed here, and the newer version of
-                                 the open document from the account (or null)
+  await DocsSync.run(local, store, { skip })   local: the documents of the browser; store: db.js; skip: the id of the open document
+                                 returns { docs, changed, incoming, conflict }: the documents after the sync, whether any changed here, the newer version
+                                 of the open document from the account (or null), and whether the open document was changed here too (the app asks the user)
+  DocsSync.mark(id, rev)         the document here is based on that version of the account (the user kept his own in a conflict)
   await DocsSync.take(doc, store)  the app took incoming: kept in the browser and marked as synced
   DocsSync.shareCode(id)         the code of the link of a document of the account (null: not shared); shareCreate(id) makes it, shareEnd(id) deletes it
   await DocsSync.shareGet(code)  the shared document (as a document of the app) or null; works without an account
@@ -67,8 +68,8 @@ const DocsSync = (() => {
     return doc;
   };
 
-  async function run(local, store, { skip, prefer } = {}) {
-    if (!user) return { docs: local, changed: false, incoming: null };
+  async function run(local, store, { skip } = {}) {
+    if (!user) return { docs: local, changed: false, incoming: null, conflict: false };
     const db = sp.client;
     const { data, error } = await db.from('scrolls').select('id, updated_at, rev:settings->updated');
     if (error) throw error;
@@ -84,10 +85,14 @@ const DocsSync = (() => {
     keepDeleted([]);
     const docs = new Map(local.map(d => [d.id, { ...d }]));
     const download = [], upload = [];
-    let changed = false, incoming = null;
+    let changed = false, incoming = null, conflict = false;
     const take_ = async row => {   // a row of the account replaces the document here
       const doc = fromRow(row);
-      if (doc.id === skip) { incoming = doc; return; }
+      if (doc.id === skip) {   // the open document: handed to the app; a conflict if it was changed here too since the last sync
+        const l = docs.get(doc.id);
+        incoming = doc; conflict = !!l && l.updated > Math.max(l.synced || 0, marks[doc.id] || 0);
+        return;
+      }
       docs.set(doc.id, doc);
       await store.put(doc);
       marks[doc.id] = doc.synced;
@@ -98,8 +103,7 @@ const DocsSync = (() => {
       if (!l) { download.push(id); continue; }
       const base = Math.max(l.synced || 0, marks[id] || 0), here = l.updated > base, there = rev > base;
       if (here && there && rev === l.updated) { marks[id] = rev; l.synced = rev; continue; }   // the same version on both sides
-      if (id === prefer && there) { download.push(id); continue; }   // the open document after a pause: a newer version there replaces it, whatever was typed
-      if (here && there) { if (l.updated > rev) upload.push(l); else download.push(id); }   // both changed: the newer one wins (no copy)
+      if (here && there) { if (id === skip || l.updated <= rev) download.push(id); else upload.push(l); }   // both changed: the newer one wins (no copy); the open document: the user decides (incoming, conflict)
       else if (there) download.push(id);
       else if (here) upload.push(l);
     }
@@ -132,13 +136,17 @@ const DocsSync = (() => {
       marks[d.id] = d.updated;
       keepSynced(marks);
     }
-    return { docs: [...docs.values()].sort((a, b) => b.updated - a.updated), changed, incoming };
+    return { docs: [...docs.values()].sort((a, b) => b.updated - a.updated), changed, incoming, conflict };
   }
   // the app took the newer version of the open document from the account (run() gave it as incoming)
   async function take(doc, store) {
     await store.put(doc);
+    mark(doc.id, doc.synced);
+  }
+  // the version of the account that a document here is based on (the user kept his own version in a conflict: it is saved over that one)
+  function mark(id, rev) {
     const marks = loadSynced();
-    marks[doc.id] = doc.synced;
+    marks[id] = rev;
     keepSynced(marks);
   }
 
@@ -167,7 +175,7 @@ const DocsSync = (() => {
   }
 
   return {
-    init, run, take, shareCode, shareCreate, shareEnd, shareGet,
+    init, run, take, mark, shareCode, shareCreate, shareEnd, shareGet,
     get user() { return user; },
     get service() { return sp; },
     forget(id, rev) { keepDeleted([...deletedIds().filter(g => g.id !== id), { id, rev: Number.isFinite(rev) ? rev : null }]); },
