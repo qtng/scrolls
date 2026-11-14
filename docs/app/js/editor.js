@@ -26,6 +26,7 @@ const vi = (en, viText, tag = 'span') => { const e = el(tag, { textContent: en }
 const titled = (e, en, viText) => { e.title = en; e.setAttribute('data-vi-title', viText); e.setAttribute('aria-label', en); e.setAttribute('data-vi-aria-label', viText); return e; };
 
 // ---------------------------------------------------------------- schema
+const DECOS = ['line', 'circle', 'dot', 'sesame'], PUNCTS = ['stop', 'comma'];   // the marks beside the characters and the punctuation after them (annotation)
 const schema = new Schema({
     nodes: {
         doc: { content: 'section+' },
@@ -56,15 +57,19 @@ const schema = new Schema({
     },
     marks: {
         warichu: { excludes: 'warichu ruby', parseDOM: [{ tag: 'span.wari' }], toDOM: () => ['span', { class: 'wari' }, 0] },
-        // ruby: rt = the text shown (Quốc Ngữ, PA or QATT), qn = the reading in Quốc Ngữ (to edit it again), side = over (vertical: right) or under (left)
+        // ruby: rt = the text shown (Quốc Ngữ, PA or QATT), qn = the reading in Quốc Ngữ (to edit it again), side = over (vertical: right) or under (left),
+        // deco = a cinnabar mark beside the base as in old texts: 'line' (characters read together, a name; vertical: right, horizontal: over),
+        // 'circle', 'dot', 'sesame' (a mark beside every character: a passage stressed); punct = a cinnabar punctuation after the last character, in
+        // its corner ('stop' 。 the end of a sentence, 'comma' 、 a pause). The mark is the annotation of the characters: it may have any of the three
+        // (reading, mark, punctuation) without the others
         ruby: {
-            attrs: { rt: { default: '' }, qn: { default: '' }, side: { default: 'over' } },
+            attrs: { rt: { default: '' }, qn: { default: '' }, side: { default: 'over' }, deco: { default: '' }, punct: { default: '' } },
             inclusive: false,
             excludes: 'ruby warichu',
             // the reading (span.rt) is never text of the document: when a backspace removes the whole base, the browser may drop the span of the
             // base too, and the reading would else be read back as the base
-            parseDOM: [{ tag: 'span.rt', ignore: true }, { tag: 'span.rb', contentElement: d => d.querySelector('.rb-b') || d, getAttrs: d => ({ rt: d.getAttribute('data-rt') || '', qn: d.getAttribute('data-qn') || '', side: d.getAttribute('data-side') === 'under' ? 'under' : 'over' }) }],
-            toDOM: m => ['span', { class: 'rb', 'data-rt': m.attrs.rt, 'data-qn': m.attrs.qn, 'data-side': m.attrs.side }, ['span', { class: 'rb-b' }, 0], ['span', { class: 'rt', contenteditable: 'false' }, m.attrs.rt]],
+            parseDOM: [{ tag: 'span.rt', ignore: true }, { tag: 'span.rb', contentElement: d => d.querySelector('.rb-b') || d, getAttrs: d => ({ rt: d.getAttribute('data-rt') || '', qn: d.getAttribute('data-qn') || '', side: d.getAttribute('data-side') === 'under' ? 'under' : 'over', deco: DECOS.includes(d.getAttribute('data-deco')) ? d.getAttribute('data-deco') : '', punct: PUNCTS.includes(d.getAttribute('data-punct')) ? d.getAttribute('data-punct') : '' }) }],
+            toDOM: m => ['span', { class: 'rb', 'data-rt': m.attrs.rt, 'data-qn': m.attrs.qn, 'data-side': m.attrs.side, ...(m.attrs.deco ? { 'data-deco': m.attrs.deco } : {}), ...(m.attrs.punct ? { 'data-punct': m.attrs.punct } : {}) }, ['span', { class: 'rb-b' }, 0], ['span', { class: 'rt', contenteditable: 'false' }, m.attrs.rt]],
         },
     },
 });
@@ -575,6 +580,9 @@ function rubyView(mark) {
         for (const c of cellsOf(text)) if (c.trim()) rt.append(el('span', { textContent: c }));
     } else rt.textContent = text;
     dom.dataset.side = mark.attrs.side;
+    if (mark.attrs.deco) dom.dataset.deco = mark.attrs.deco;
+    if (mark.attrs.punct) dom.dataset.punct = mark.attrs.punct;
+    if (mark.attrs.rt) dom.classList.add('has-rt');
     rt.contentEditable = 'false';
     dom.append(contentDOM, rt);
     return { dom, contentDOM, ignoreMutation: m => m.type !== 'selection' && !contentDOM.contains(m.target) };
@@ -729,7 +737,7 @@ const UI = {
         this.bH2 = btn(hIcon(2), 'Subheading', 'Tiêu đề phụ', cmd(setHeading(2)));
         this.bWari = btn(vi('split', 'chia'), 'Two-column text', 'Chữ hai dòng', cmd(toggleWari));
         this.bWari.classList.add('txt');
-        this.bRuby = btn(icon('fa-pencil'), 'Ruby (reading)', 'Chú âm', () => RubyBox.open());
+        this.bRuby = btn(el('i', { className: 'fa-solid fa-message' }), 'Annotation (reading, marks, punctuation)', 'Chú thích (cách đọc, dấu, dấu câu)', () => RubyBox.open());
         // the settings of the paragraphs are drop-downs; the group label of the list says what the option is
         const select = (label, labelVi, options, change) => {
             const sel = el('select', { className: 'form-select form-select-sm' });
@@ -800,7 +808,7 @@ const UI = {
 
 // the box to write a ruby: a field (Quốc Ngữ, with Telex), the readings of the dictionary, the script (QN, PA, QATT), the side, each character
 const RubyBox = {
-    view: null, range: null, kind: 'qn', side: 'over',
+    view: null, range: null, kind: 'qn', side: 'over', deco: '', punct: '',
     init(view) {
         this.view = view;
         try { this.kind = localStorage.getItem('scrollsRubyKind') || (window.Readings && Readings.shown && Readings.shown()[0]) || 'qn'; } catch (e) { /* default */ }
@@ -821,7 +829,24 @@ const RubyBox = {
         });
         this.input.addEventListener('input', () => this.preview());
         this.ok = btn(el('i', { className: 'fa-solid fa-check' }), 'Apply', 'Áp dụng', () => this.apply(this.input.value));
-        this.del = btn(el('i', { className: 'fa-solid fa-trash' }), 'Remove the ruby', 'Bỏ chú âm', () => this.apply(''));
+        this.del = btn(el('i', { className: 'fa-solid fa-trash' }), 'Remove the annotation', 'Bỏ chú thích', () => { this.deco = ''; this.punct = ''; this.apply(''); });
+        // the marks in cinnabar beside the characters: one of them or none (a second tap takes it away)
+        this.decoBtns = [
+            ['line', el('span', { textContent: 'Line', 'data-vi': 'Vạch' }), 'Cinnabar line beside the characters (read together)', 'Vạch son bên cạnh chữ (đọc liền)'],
+            ['circle', '○', 'A circle beside every character', 'Vòng tròn bên cạnh mỗi chữ'],
+            ['dot', '●', 'A dot beside every character', 'Chấm bên cạnh mỗi chữ'],
+            ['sesame', '﹅', 'A sesame dot beside every character', 'Chấm vừng bên cạnh mỗi chữ'],
+        ].map(([d, content, en, vi]) => {
+            const b = btn(content, en, vi, () => { this.deco = this.deco === d ? '' : d; this.markDeco(); this.input.focus(); }, 'deco-btn');
+            b.dataset.d = d;
+            return b;
+        });
+        // the punctuation in cinnabar after the last character: one or none
+        this.punctBtns = [['stop', el('span', { className: 'punct-sample', textContent: '字。' }), 'A circle after the characters (end of a sentence)', 'Vòng tròn sau chữ (hết câu)'], ['comma', el('span', { className: 'punct-sample', textContent: '字、' }), 'A comma after the characters (a pause)', 'Dấu phẩy sau chữ (ngắt hơi)']].map(([d, content, en, vi]) => {
+            const b = btn(content, en, vi, () => { this.punct = this.punct === d ? '' : d; this.markDeco(); this.input.focus(); }, 'deco-btn');
+            b.dataset.p = d;
+            return b;
+        });
         this.shown = el('span', { className: 'rt-preview' });
         this.eachBtn = btn(el('i', { className: 'fa-solid fa-wand-magic-sparkles' }), 'Each character its reading from the dictionary', 'Từng chữ theo từ điển', () => this.eachChar());
         this.kindBtns = Scripts.KINDS.map(([k, label]) => {
@@ -831,10 +856,15 @@ const RubyBox = {
         });
         this.overBtn = btn(el('i', { className: 'bi' }), 'Over (vertical: right)', 'Trên (dọc: bên phải)', () => this.setSide('over'));
         this.underBtn = btn(el('i', { className: 'bi' }), 'Under (vertical: left)', 'Dưới (dọc: bên trái)', () => this.setSide('under'));
+        const head = (en, vi) => el('div', { className: 'rt-head', textContent: en, 'data-vi': vi });
         this.box = el('div', { className: 'scroll-ui ruby-box bg-light', hidden: true },
-            el('div', { className: 'rt-row' }, this.input, this.ok, this.del),
+            el('div', { className: 'rt-row rt-title' }, el('span', { className: 'rt-name', textContent: 'Annotation', 'data-vi': 'Chú thích' }), this.del, this.ok),
+            head('Reading', 'Cách đọc'),
+            el('div', { className: 'rt-row' }, this.input),
             el('div', { className: 'rt-row' }, this.shown),
-            el('div', { className: 'rt-row' }, ...this.kindBtns, el('span', { className: 'sep' }), this.overBtn, this.underBtn, el('span', { className: 'sep' }), this.eachBtn));
+            el('div', { className: 'rt-row' }, ...this.kindBtns, el('span', { className: 'sep' }), this.overBtn, this.underBtn, el('span', { className: 'sep' }), this.eachBtn),
+            head('Marks', 'Dấu son'),
+            el('div', { className: 'rt-row' }, ...this.decoBtns, el('span', { className: 'sep' }), ...this.punctBtns));
         this.box.addEventListener('mousedown', e => { if (e.target !== this.input) e.preventDefault(); });
         document.body.append(this.box);
         document.addEventListener('pointerdown', e => { if (this.isOpen() && !this.box.contains(e.target)) this.close(false); });
@@ -858,11 +888,13 @@ const RubyBox = {
         this.range = range;
         const mark = range.mark || null;
         this.side = mark ? mark.attrs.side : this.side;
+        this.deco = (mark && mark.attrs.deco) || '';
+        this.punct = (mark && mark.attrs.punct) || '';
         this.input.value = mark ? (mark.attrs.qn || mark.attrs.rt) : '';
         this.base = state.doc.textBetween(range.from, range.to);
         this.del.hidden = !mark;
         this.eachBtn.hidden = [...this.base].length < 2;
-        this.markKind(); this.markSide();
+        this.markKind(); this.markSide(); this.markDeco();
         this.box.hidden = false;
         this.place();
         this.input.focus();
@@ -882,6 +914,10 @@ const RubyBox = {
         const t = Scripts.text(this.input.value.trim(), this.kind);
         this.shown.textContent = this.kind === 'qn' ? '' : t;
         this.shown.hidden = this.kind === 'qn';
+    },
+    markDeco() {
+        for (const b of this.decoBtns) b.classList.toggle('on', b.dataset.d === this.deco);
+        for (const b of this.punctBtns) b.classList.toggle('on', b.dataset.p === this.punct);
     },
     markKind() {
         for (const b of this.kindBtns) b.classList.toggle('on', b.dataset.k === this.kind);
@@ -905,7 +941,7 @@ const RubyBox = {
         qn = (qn || '').trim();
         if (qn && this.kind !== 'qn') await Scripts.load();
         const { from, to } = this.range, type = schema.marks.ruby, tr = this.view.state.tr.removeMark(from, to, type);
-        if (qn) tr.addMark(from, to, type.create({ rt: Scripts.text(qn, this.kind), qn, side: this.side }));
+        if (qn || this.deco || this.punct) tr.addMark(from, to, type.create({ rt: qn ? Scripts.text(qn, this.kind) : '', qn, side: this.side, deco: this.deco, punct: this.punct }));
         this.view.dispatch(tr);
         this.close(true);
     },
@@ -918,7 +954,8 @@ const RubyBox = {
         let pos = from;
         chars.forEach((c, i) => {
             const qn = readings[i][0];
-            if (qn) tr.addMark(pos, pos + c.length, type.create({ rt: Scripts.text(qn, this.kind), qn, side: this.side }));
+            const punct = i === chars.length - 1 ? this.punct : '';
+            if (qn || this.deco || punct) tr.addMark(pos, pos + c.length, type.create({ rt: qn ? Scripts.text(qn, this.kind) : '', qn: qn || '', side: this.side, deco: this.deco, punct }));
             pos += c.length;
         });
         this.view.dispatch(tr);
