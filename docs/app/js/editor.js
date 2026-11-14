@@ -26,7 +26,8 @@ const vi = (en, viText, tag = 'span') => { const e = el(tag, { textContent: en }
 const titled = (e, en, viText) => { e.title = en; e.setAttribute('data-vi-title', viText); e.setAttribute('aria-label', en); e.setAttribute('data-vi-aria-label', viText); return e; };
 
 // ---------------------------------------------------------------- schema
-const DECOS = ['line', 'circle', 'dot', 'sesame', 'sesame-open'], PUNCTS = ['stop', 'comma'];   // the marks beside the characters and the punctuation after them (annotation)
+const READMARKS = ['𡿨', '亇', '个', '亅', 'ン', 'ソ'];   // reading marks of Chữ Nôm (deco rd1..rd6): small, in the colour of the text, beside every character
+const DECOS = ['line', 'circle', 'dot', 'sesame', 'sesame-open', ...Array.from({ length: 6 }, (_, i) => 'rd' + (i + 1))], PUNCTS = ['stop', 'comma'];   // the marks beside the characters and the punctuation after them (annotation)
 const schema = new Schema({
     nodes: {
         doc: { content: 'section+' },
@@ -864,6 +865,7 @@ const RubyBox = {
             ['dot', '●', 'A dot beside every character', 'Chấm bên cạnh mỗi chữ'],
             ['sesame', '﹅', 'A sesame dot beside every character', 'Chấm vừng bên cạnh mỗi chữ'],
             ['sesame-open', '﹆', 'An open sesame dot beside every character', 'Chấm vừng rỗng bên cạnh mỗi chữ'],
+            ...READMARKS.map((c, i) => ['rd' + (i + 1), el('span', { className: 'punct-sample', textContent: c }), 'A reading mark beside every character', 'Dấu đọc bên cạnh mỗi chữ']),
         ].map(([d, content, en, vi]) => {
             const b = btn(content, en, vi, () => { this.deco = this.deco === d ? '' : d; this.markDeco(); this.input.focus(); }, 'deco-btn');
             b.dataset.d = d;
@@ -892,7 +894,8 @@ const RubyBox = {
             el('div', { className: 'rt-row' }, this.shown),
             el('div', { className: 'rt-row' }, ...this.kindBtns, el('span', { className: 'sep' }), this.overBtn, this.underBtn, el('span', { className: 'sep' }), this.eachBtn),
             head('Marks', 'Dấu son'),
-            el('div', { className: 'rt-row' }, ...this.decoBtns, el('span', { className: 'sep' }), ...this.punctBtns));
+            el('div', { className: 'rt-row' }, ...this.decoBtns.slice(0, 5), el('span', { className: 'sep' }), ...this.punctBtns),
+            el('div', { className: 'rt-row' }, ...this.decoBtns.slice(5)));
         this.box.addEventListener('mousedown', e => { if (e.target !== this.input) e.preventDefault(); });
         document.body.append(this.box);
         document.addEventListener('pointerdown', e => { if (this.isOpen() && !this.box.contains(e.target)) this.close(false); });
