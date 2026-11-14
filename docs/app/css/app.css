@@ -147,6 +147,13 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .ProseMirror .rb[data-deco="sesame"] > .rb-b { text-emphasis-style: filled sesame; }
 .ProseMirror .rb[data-deco] > .rb-b { text-emphasis-color: var(--cinnabar, #e34234); text-emphasis-position: over right; }
 .ProseMirror .rb.has-rt[data-side="over"][data-deco] > .rb-b { text-emphasis-position: under left; }
+/* the punctuation after the last character, in its corner, taking no room: positioned absolutely without insets it stays where it would follow
+   the last character (also behind the end of a column or line) and takes neither the line nor the dots of the base; margins move it */
+.ProseMirror .rb[data-punct] > .rb-b::after { position: absolute; color: var(--cinnabar, #e34234); font-size: 1em; line-height: 1; font-weight: 700; }
+.ProseMirror .rb[data-punct="stop"] > .rb-b::after { content: '\3002'; }
+.ProseMirror .rb[data-punct="comma"] > .rb-b::after { content: '\3001'; }
+.ProseMirror .grp.v .rb[data-punct] > .rb-b::after { margin-block-start: var(--punct-v-b, -.3em); margin-inline-start: var(--punct-v-i, -.8em); }
+.ProseMirror .grp.h .rb[data-punct] > .rb-b::after { margin-block-start: var(--punct-h-b, .68em); margin-inline-start: var(--punct-h-i, -.2em); }
 .ProseMirror .grp.h .rb .rt.cells { left: 0; right: 0; }
 .ProseMirror .grp.v .rb .rt.cells { top: 0; bottom: 0; }
 
@@ -162,7 +169,13 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .ruby-box .rt-row { display: flex; align-items: center; gap: 2px; }
 .ruby-box .rt-input { flex: 1 1 auto; min-width: 0; height: 2.2rem; padding: 0 .5rem; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--ink); font-size: 1rem; outline: 0; }
 .ruby-box .rt-input:focus { border-color: var(--accent); }
-.ruby-box .deco-btn { color: var(--cinnabar, #e34234); min-width: 2.2rem; }
+.ruby-box .deco-btn { color: var(--cinnabar, #e34234); min-width: 2.2rem; font-size: 1.1rem; }
+.ruby-box .deco-btn.on { color: var(--cinnabar, #e34234); background: color-mix(in srgb, var(--cinnabar, #e34234) 25%, transparent); }
+.ruby-box .deco-btn[data-d="line"] { font-size: .9rem; }
+.ruby-box .punct-sample { font-family: var(--doc-font), var(--nom), serif; }
+.ruby-box .rt-title { border-bottom: 1px solid var(--line); padding-bottom: 4px; }
+.ruby-box .rt-name { flex: 1 1 auto; padding: 0 .3rem; font-weight: 600; }
+.ruby-box .rt-head { padding: 2px .3rem 0; font-size: .75rem; opacity: .7; }
 .ruby-box .rt-preview { font-family: var(--doc-font), var(--nom), serif; font-size: 1.15rem; padding: 0 .3rem; min-height: 1.2em; }
 
 /* the key bar above the keyboard (as in Qatt.org Notes): slots of flexible width, centred; the narrow button with the triangle opens the other candidates */
