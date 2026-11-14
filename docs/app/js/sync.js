@@ -4,7 +4,8 @@ The app works on the documents in the browser (db.js); signed in, it compares th
 some seconds after a change and by hand) and takes the newer side of each document. A row: id (= the id of the document), title (the title shown, for other
 lists), content (the ProseMirror JSON), settings: { app: 'nom-notes', updated, created, text, title?, format?, style? } (`updated` in milliseconds is the
 version that is compared). Rows of the first editor of Scrolls (no settings.app) are taken over as they are (their content is converted by the editor).
-Both sides changed since the last sync: the newer one wins, the other one is dropped (no copies). The open document is not replaced under the hands of
+Both sides changed since the last sync: the newer one wins, the other one is dropped (no copies). Just before a document is saved in the account
+its row there is read again: if another device saved a newer version meanwhile, that one is loaded and nothing is saved. The open document is not replaced under the hands of
 the user: run() hands its newer version to the app, which takes it only if nothing was typed meanwhile (else the next sync uploads what was typed).
 A document deleted here is deleted in the account at the next sync (its id and version wait in localStorage "nomNotesDeleted"), unless it was changed
 there after the version known here (then it comes back); one deleted in the account (by another device) goes here too if it had been synced before and
@@ -83,6 +84,14 @@ const DocsSync = (() => {
     const docs = new Map(local.map(d => [d.id, { ...d }]));
     const download = [], upload = [];
     let changed = false, incoming = null;
+    const take_ = async row => {   // a row of the account replaces the document here
+      const doc = fromRow(row);
+      if (doc.id === skip) { incoming = doc; return; }
+      docs.set(doc.id, doc);
+      await store.put(doc);
+      marks[doc.id] = doc.synced;
+      changed = true;
+    };
     for (const [id, rev] of remote) {
       const l = docs.get(id);
       if (!l) { download.push(id); continue; }
@@ -104,18 +113,15 @@ const DocsSync = (() => {
       const part = download.slice(i, i + 50);
       const { data: rows, error: e } = await db.from('scrolls').select('id, title, settings, content, created_at, updated_at').in('id', part);
       if (e) throw e;
-      for (const row of rows) {
-        const doc = fromRow(row);
-        if (doc.id === skip) { incoming = doc; continue; }
-        docs.set(doc.id, doc);
-        await store.put(doc);
-        marks[doc.id] = doc.synced;
-        changed = true;
-      }
+      for (const row of rows) await take_(row);
     }
     keepSynced(marks);
     // the documents that are newer here
     for (const d of upload) {
+      // just before saving: has another device saved a newer version since the list was read? then that one is loaded and nothing is saved
+      const { data: now0, error: e0 } = await db.from('scrolls').select('id, title, settings, content, created_at, updated_at').in('id', [d.id]);
+      if (e0) throw e0;
+      if (now0 && now0[0] && revOf(now0[0]) > d.updated) { await take_(now0[0]); keepSynced(marks); continue; }
       const { error: e } = await db.from('scrolls').upsert(toRow(d));
       if (e) throw e;
       const now = docs.get(d.id) || d;
