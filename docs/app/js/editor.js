@@ -888,13 +888,13 @@ const RubyBox = {
             ['sesame-open', '﹆', 'An open sesame dot beside every character', 'Chấm vừng rỗng bên cạnh mỗi chữ'],
             ...READMARKS.map((c, i) => ['rd' + (i + 1), el('span', { className: 'punct-sample', textContent: c }), 'A reading mark beside every character', 'Dấu đọc bên cạnh mỗi chữ']),
         ].map(([d, content, en, vi]) => {
-            const b = btn(content, en, vi, () => { this.deco = this.deco === d ? '' : d; this.markDeco(); this.input.focus(); }, 'deco-btn');
+            const b = btn(content, en, vi, () => { this.deco = this.deco === d ? '' : d; this.markDeco(); }, 'deco-btn');
             b.dataset.d = d;
             return b;
         });
         // the punctuation in cinnabar after the last character: one or none
         this.punctBtns = [['stop', el('span', { className: 'punct-sample', textContent: '字。' }), 'A circle after the characters (end of a sentence)', 'Vòng tròn sau chữ (hết câu)'], ['comma', el('span', { className: 'punct-sample', textContent: '字、' }), 'A comma after the characters (a pause)', 'Dấu phẩy sau chữ (ngắt hơi)']].map(([d, content, en, vi]) => {
-            const b = btn(content, en, vi, () => { this.punct = this.punct === d ? '' : d; this.markDeco(); this.input.focus(); }, 'deco-btn');
+            const b = btn(content, en, vi, () => { this.punct = this.punct === d ? '' : d; this.markDeco(); }, 'deco-btn');
             b.dataset.p = d;
             return b;
         });
@@ -909,7 +909,7 @@ const RubyBox = {
         this.underBtn = btn(el('i', { className: 'bi' }), 'Under (vertical: left)', 'Dưới (dọc: bên trái)', () => this.setSide('under'));
         const head = (en, vi) => el('div', { className: 'rt-head', textContent: en, 'data-vi': vi });
         this.box = el('div', { className: 'scroll-ui ruby-box bg-light', hidden: true },
-            el('div', { className: 'rt-row rt-title' }, el('span', { className: 'rt-name', textContent: 'Annotation', 'data-vi': 'Chú thích' }), this.del, this.ok),
+            el('div', { className: 'rt-row rt-title' }, el('span', { className: 'rt-name', textContent: 'Annotation', 'data-vi': 'Chú thích' }), this.ok, this.del),
             head('Reading', 'Cách đọc'),
             el('div', { className: 'rt-row' }, this.input),
             el('div', { className: 'rt-row' }, this.shown),
@@ -951,8 +951,6 @@ const RubyBox = {
         this.markKind(); this.markSide(); this.markDeco();
         this.box.hidden = false;
         this.place();
-        this.input.focus();
-        this.input.select();
         if (this.kind !== 'qn') await Scripts.load();
         this.preview();
         this.place();
@@ -988,9 +986,8 @@ const RubyBox = {
         try { localStorage.setItem('scrollsRubyKind', k); } catch (e) { /* only now */ }
         if (k !== 'qn') await Scripts.load();
         this.markKind(); this.preview();
-        this.input.focus();
     },
-    setSide(s) { this.side = s; this.markSide(); this.input.focus(); },
+    setSide(s) { this.side = s; this.markSide(); },
     async apply(qn) {
         qn = (qn || '').trim();
         if (qn && this.kind !== 'qn') await Scripts.load();
