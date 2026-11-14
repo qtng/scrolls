@@ -131,6 +131,11 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .ProseMirror .grp.v .rb .rt { top: 50%; transform: translateY(-50%) scaleY(var(--rs, 1)); }
 .ProseMirror .grp.v .rb[data-side="over"] .rt { left: 100%; }
 .ProseMirror .grp.v .rb[data-side="under"] .rt { right: 100%; }
+/* a reading of single cells: spread over the whole base, each cell in an equal share (editor.js sets the size) */
+.ProseMirror .grp .rb .rt.cells { display: flex; justify-content: space-around; align-items: center; transform: none; }
+.ProseMirror .rb .rt.cells > span { flex: 1 1 0; display: flex; justify-content: center; }
+.ProseMirror .grp.h .rb .rt.cells { left: 0; right: 0; }
+.ProseMirror .grp.v .rb .rt.cells { top: 0; bottom: 0; }
 
 /* the box to write a ruby (editor.js), under the format bar */
 .scroll-ui { position: fixed; z-index: 15; display: flex; align-items: center; gap: 2px; padding: 3px; border-radius: 12px; background: rgba(58, 51, 42, .95); color: var(--ink);
