@@ -752,6 +752,11 @@ window.notesApp = { store, ready, flush() } is for the tests.
     lastActive = now;
   };
   for (const type of ['keydown', 'pointerdown', 'beforeinput']) $('editor').addEventListener(type, activity, true);
+  // the regular sync every 30 s (an open document follows the changes of another device) stops after 2 minutes without a key or tap anywhere in the app
+  const IDLE = 120000;
+  let lastUsed = Date.now();
+  for (const type of ['keydown', 'pointerdown']) document.addEventListener(type, () => { lastUsed = Date.now(); }, true);
+  setInterval(() => { if (document.visibilityState === 'visible' && Date.now() - lastUsed < IDLE) sync(); }, 30000);
   function renderAccount() {
     const u = DocsSync.user, label = $('account-label');
     if (u) { label.setAttribute('data-vi', 'Đăng xuất (' + (u.email || '') + ')'); label.textContent = 'Sign out (' + (u.email || '') + ')'; }
@@ -767,7 +772,6 @@ window.notesApp = { store, ready, flush() } is for the tests.
   });
   $('sync-now').addEventListener('click', () => { closeMenu(); sync(true); });
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') sync(); });
-  setInterval(() => { if (document.visibilityState === 'visible') sync(); }, 30000);   // an open document follows the changes of another device
 
   document.addEventListener('gesturestart', e => e.preventDefault());
 
