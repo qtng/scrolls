@@ -250,7 +250,7 @@ input.doc-title:focus { border-color: var(--accent); }
 .size-btn[aria-expanded="true"] { color: var(--accent); border-color: var(--accent); }
 .fmtbar .page-tools button { width: 40px; height: 40px; }
 .fmtbar .ime-select { max-width: 6.5rem; }
-.fmtbar .size-select { flex: none; width: auto; }
+.fmtbar .size-select { flex: none; width: 5.2em; max-width: none; }   /* the longest entry is "96px": always the same width */
 
 /* shared (somebody else's link): reading only; the owner shares and ends the link from the bar */
 #view-editor.shared #edit-btn, #view-editor.shared #share-btn { display: none; }

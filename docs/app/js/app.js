@@ -500,7 +500,7 @@ window.notesApp = { store, ready, flush() } is for the tests.
   const MAX_CHARS = 23;
   const pageWidth = () => Math.min(MAX_CHARS, Math.round(room() / BASE * 10) / 10);   // in characters of 32 px, at most 23
   // Two sizes: the zoom (reading only, the slider of the title bar, not kept) scales the page and its text together; the font size of the
-  // document (editing, format.textSize: 14 … 144 px, 24 by default; kept and synced) scales only the text in its page of
+  // document (editing, format.textSize: 14 … 96 px, 24 by default; kept and synced) scales only the text in its page of
   // fixed width, so that more or less fits on a page. The unit (--unit) is 32 px at 100 % (more on a wide screen), the page is format.width units
   // wide, the text is textSize / 32 of a unit, i.e. textSize px. (Later a size of
   // a paragraph or a character can be relative to the text of the document, in em.)
@@ -596,7 +596,7 @@ window.notesApp = { store, ready, flush() } is for the tests.
     }, { passive: false });
   }
   // the font size of the document: one of the sizes of the list, in px (24 by default)
-  const TEXT_SIZES = [14, 16, 18, 20, 24, 28, 32, 36, 48, 72, 96, 144];
+  const TEXT_SIZES = [14, 16, 18, 20, 24, 28, 32, 36, 48, 72, 96];
   function textSizeOf(doc) {
     const f = doc && doc.format || {};
     return TEXT_SIZES.includes(f.textSize) ? f.textSize : 24;
