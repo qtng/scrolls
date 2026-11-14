@@ -62,7 +62,6 @@
       <a id="home-logo" class="home-logo" href="https://chunom.org/" hidden aria-label="Chunom" title="chunom.org"><img src="icons/icon-192.png" alt="" width="36" height="36"></a>
       <button id="undo-btn" class="bar-btn" type="button" disabled aria-label="Undo" data-vi-aria-label="Hoàn tác" title="Undo" data-vi-title="Hoàn tác"><span class="uni" aria-hidden="true">↶</span></button>
       <button id="redo-btn" class="bar-btn" type="button" disabled aria-label="Redo" data-vi-aria-label="Làm lại" title="Redo" data-vi-title="Làm lại"><span class="uni" aria-hidden="true">↷</span></button>
-      <span id="page-new" class="page-tools"></span>
       <span class="grow"></span>
       <input id="read-zoom" class="read-zoom" type="range" min="50" max="300" step="any" value="100" autocomplete="off" aria-label="Zoom" data-vi-aria-label="Thu phóng">
       <span class="grow"></span>
@@ -80,6 +79,7 @@
         <div id="page-menu"></div>
         <div class="menu-sep" role="separator"></div>
         <label class="menu-row"><span data-vi="Bảng vần">Rhyme table</span><select id="set-decoding" autocomplete="off"></select></label>
+        <label class="menu-row"><span data-vi="Cách nhập">Input</span><select id="set-ime" autocomplete="off"><option value="telex">Telex</option><option value="off" data-vi="Không Telex">No Telex</option></select></label>
         <div class="menu-sep" role="separator"></div>
         <button id="menu-delete" type="button"><i class="fa-solid fa-trash"></i> <span data-vi="Xóa">Delete</span></button>
         <div class="menu-group"><span class="menu-label" data-vi="Phông chữ">Font</span><div id="set-font" role="radiogroup"></div></div>
@@ -87,15 +87,8 @@
     </header>
     <div id="fmtbar" class="fmtbar" role="toolbar" aria-label="Format" data-vi-aria-label="Định dạng">
       <span id="toolbar" class="tools"></span>
+      <select id="set-size" class="ime-select size-select" autocomplete="off" aria-label="Font size" data-vi-aria-label="Cỡ chữ" title="Font size" data-vi-title="Cỡ chữ"><optgroup label="Font size" data-vi-label="Cỡ chữ"><option value="14">14px</option><option value="16">16px</option><option value="18">18px</option><option value="20">20px</option><option value="24">24px</option><option value="28">28px</option><option value="32">32px</option><option value="36">36px</option><option value="48">48px</option><option value="72">72px</option><option value="96">96px</option></optgroup></select>
       <span id="page-tools" class="page-tools"></span>
-      <select id="set-size" class="ime-select size-select" autocomplete="off" aria-label="Font size" data-vi-aria-label="Cỡ chữ" title="Font size" data-vi-title="Cỡ chữ"><optgroup label="Font size" data-vi-label="Cỡ chữ"><option value="14">14px</option><option value="16">16px</option><option value="18">18px</option><option value="20">20px</option><option value="24">24px</option><option value="28">28px</option><option value="32">32px</option><option value="36">36px</option><option value="48">48px</option><option value="72">72px</option><option value="96">96px</option><option value="144">144px</option></optgroup></select>
-      <select id="set-ime" class="ime-select" autocomplete="off" aria-label="Input" data-vi-aria-label="Cách nhập" title="Input" data-vi-title="Cách nhập">
-        <option value="qn" data-vi="Quốc Ngữ">Quốc Ngữ</option>
-        <option value="qatt" data-vi="QATT Telex">QATT Telex</option>
-        <option value="pa" data-vi="PA Telex">PA Telex</option>
-        <option value="direct" data-vi="QATT trực tiếp">QATT direct</option>
-        <option value="off" data-vi="Không Telex">No Telex</option>
-      </select>
     </div>
     <div id="field" class="field">
       <div class="doc-head">
@@ -107,7 +100,6 @@
     <div id="keybar" class="keybar" hidden>
       <span class="variants" role="group" aria-label="Chữ Nôm candidates and variants of the characters before the cursor" data-vi-aria-label="Gợi ý Chữ Nôm và biến thể của các ký tự trước con trỏ"><button type="button" class="variant" disabled>·</button><button type="button" class="variant" disabled>·</button><button type="button" class="variant" disabled>·</button><button type="button" class="variant" disabled>·</button><button type="button" class="variant" disabled>·</button><button type="button" class="variant" disabled>·</button><button type="button" class="variant" disabled>·</button><button type="button" class="variant" disabled>·</button><button type="button" class="variant" disabled>·</button><button type="button" class="variant" disabled>·</button><button id="nom-more-btn" type="button" class="more" disabled aria-expanded="false" aria-controls="nom-more" aria-label="More Chữ Nôm candidates" data-vi-aria-label="Thêm gợi ý Chữ Nôm" title="More Chữ Nôm candidates" data-vi-title="Thêm gợi ý Chữ Nôm"><i class="fa-solid fa-caret-up"></i></button></span>
       <div id="nom-more" class="nom-more" hidden></div>
-      <div id="directbar" class="directbar" role="group" aria-label="QATT letters" data-vi-aria-label="Chữ QATT"></div>
     </div>
   </section>
   <div id="fontinfo" class="clip" hidden>

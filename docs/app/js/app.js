@@ -95,7 +95,7 @@ window.notesApp = { store, ready, flush() } is for the tests.
   window.addEventListener('pagehide', () => { save(); });
 
   // ----- editor -----
-  NomEditor.mount($('editor'), { format: $('toolbar'), dir: $('page-tools'), menu: $('page-menu'), newPage: $('page-new') }, [NomInput.plugin]);
+  NomEditor.mount($('editor'), { format: $('toolbar'), dir: $('page-tools'), menu: $('page-menu'), newPage: $('page-tools') }, [NomInput.plugin]);
   $('menu').addEventListener('click', e => { if (e.target.closest('.menu-close')) closeMenu(); });
   const edited = () => { schedule(); showTitle(); buttons(); };
   const showTitle = () => {   // above the pages; without a title a muted "Untitled"
@@ -290,13 +290,14 @@ window.notesApp = { store, ready, flush() } is for the tests.
     else { history.replaceState(null, '', '#/'); route(); }
   });
 
-  // ----- key bar: slots: the word in the other script (QATT Telex: PA, PA Telex: QATT), then the Chữ Nôm candidates of the word before the caret
+  // ----- key bar: slots: the word before the caret as QATT (first) and PA (second), then its Chữ Nôm candidates, the first of them marked
   // (more of them in a list above the bar, opened by the narrow button with the triangle), else the variants of the QATT characters before it.
   // It sits above the keyboard (the editor view ends at the top of the keyboard), while a document is edited. -----
   const keybar = $('keybar'), slotBtns = Array.from(document.querySelectorAll('#keybar .variant')), moreBtn = $('nom-more-btn'), morePanel = $('nom-more');
   let shownKeys = null, shown = [], rest = [], slots = 0;
+  const SLOTS_MIN = 7, SLOT_W = 47;   // a phone shows 7 slots, a wide screen more
   function fitSlots() {   // the number of slots follows the width of the bar: 5 on a phone, up to 10 on a wide screen
-    const n = Math.max(5, Math.min(slotBtns.length, Math.floor((keybar.clientWidth - 60) / 62)));
+    const n = Math.max(SLOTS_MIN, Math.min(slotBtns.length, Math.floor((keybar.clientWidth - 40) / SLOT_W)));
     if (!keybar.clientWidth || n === slots) return;
     slots = n; shownKeys = null;
     slotBtns.forEach((btn, i) => { btn.hidden = i >= n; });
@@ -318,17 +319,20 @@ window.notesApp = { store, ready, flush() } is for the tests.
     keybar.hidden = !NomEditor.editable || !state.current;
     if (keybar.hidden) { showMore(false); return; }
     fitSlots();
-    const alt = NomInput.alternate(), nom = NomInput.candidates(), list = alt ? [alt, ...nom] : nom;
+    const list = NomInput.candidates();
     shown = list.length ? list.slice(0, slots) : [];
     if (!list.length) NomInput.variants().forEach((v, i) => { shown[i] = v; });
     rest = list.slice(slots);
-    const key = (list.length ? 'n' : 'v') + slotBtns.map((b, i) => (shown[i] ? shown[i].glyph || shown[i].id + shown[i].view : '')).join() + '|' + rest.length;
+    const key = (list.length ? 'n' : 'v') + slotBtns.map((b, i) => (shown[i] ? (shown[i].first ? '*' : '') + (shown[i].glyph || shown[i].id + shown[i].view) : '')).join() + '|' + rest.length;
     if (key === shownKeys) return;
     shownKeys = key;
     slotBtns.forEach((btn, i) => {
       const v = shown[i];
       btn.disabled = !v;
       btn.classList.toggle('nom', !!(v && v.glyph && !v.script));
+      btn.classList.toggle('first', !!(v && v.first));
+      btn.classList.toggle('qatt', !!(v && v.script === 'qatt'));
+      btn.classList.toggle('pa', !!(v && v.script === 'pa'));
       btn.textContent = v ? v.glyph || v.view : '·';
       btn.title = !v ? '' : v.script ? (v.script === 'pa' ? 'PA' : 'QATT') : v.glyph ? v.reading : Lang.t(v.en, v.vi);
     });
@@ -344,25 +348,18 @@ window.notesApp = { store, ready, flush() } is for the tests.
   window.addEventListener('resize', () => { shownKeys = null; renderKeys(); });
   document.addEventListener('langchange', () => { shownKeys = null; renderKeys(); });
 
-  // the input (for every document, kept in this browser): Quốc Ngữ, QATT Telex, PA Telex, QATT direct input (a bar of the 22 shapes; digits 1–8 are tones) or none
-  const IME_KEY = 'nomNotesIme', directbar = $('directbar');
-  directbar.append(...VietnameseParser.SHAPES.map((shape, k) => {
-    const btn = document.createElement('button');
-    btn.type = 'button'; btn.textContent = NomInput.shapes[k]; btn.title = shape === 'z' ? '_' : shape;
-    btn.addEventListener('pointerdown', keepFocus);
-    btn.addEventListener('click', () => NomInput.typeShape(k));
-    return btn;
-  }));
+  // the input (for every document, kept in this browser; the dropdown is in the menu): Telex, or none for a keyboard that writes Quốc Ngữ itself.
+  // The key bar shows the candidates in both. (Earlier versions had QATT and PA Telex and QATT direct input: they become Telex.)
+  const IME_KEY = 'nomNotesIme';
   function setIme(mode, keep) {
     mode = NomInput.setMode(mode);
     NomEditor.setTelex(NomInput.telexOn());
-    keybar.classList.toggle('direct', mode === 'direct');
     $('set-ime').value = mode;
     shownKeys = null; renderKeys();
     if (keep) try { localStorage.setItem(IME_KEY, mode); } catch (e) { /* not kept */ }
   }
-  $('set-ime').addEventListener('change', () => { setIme($('set-ime').value, true); NomEditor.focus(); });
-  try { setIme(localStorage.getItem(IME_KEY)); } catch (e) { setIme('qn'); }
+  $('set-ime').addEventListener('change', () => { setIme($('set-ime').value, true); closeMenu(); NomEditor.focus(); });
+  try { setIme(localStorage.getItem(IME_KEY)); } catch (e) { setIme('telex'); }
 
   // the keyboard covers the lower part of the screen: the editor view ends above it. Chrome on Android shrinks the page itself (interactive-widget=resizes-content
   // in the viewport tag); where the page keeps its size under the keyboard (Safari on the iPhone) the visual viewport tells how much is left above it.
@@ -503,7 +500,7 @@ window.notesApp = { store, ready, flush() } is for the tests.
   const MAX_CHARS = 23;
   const pageWidth = () => Math.min(MAX_CHARS, Math.round(room() / BASE * 10) / 10);   // in characters of 32 px, at most 23
   // Two sizes: the zoom (reading only, the slider of the title bar, not kept) scales the page and its text together; the font size of the
-  // document (editing, format.textSize: 14 … 144 px, 24 by default; kept and synced) scales only the text in its page of
+  // document (editing, format.textSize: 14 … 96 px, 24 by default; kept and synced) scales only the text in its page of
   // fixed width, so that more or less fits on a page. The unit (--unit) is 32 px at 100 % (more on a wide screen), the page is format.width units
   // wide, the text is textSize / 32 of a unit, i.e. textSize px. (Later a size of
   // a paragraph or a character can be relative to the text of the document, in em.)
@@ -599,7 +596,7 @@ window.notesApp = { store, ready, flush() } is for the tests.
     }, { passive: false });
   }
   // the font size of the document: one of the sizes of the list, in px (24 by default)
-  const TEXT_SIZES = [14, 16, 18, 20, 24, 28, 32, 36, 48, 72, 96, 144];
+  const TEXT_SIZES = [14, 16, 18, 20, 24, 28, 32, 36, 48, 72, 96];
   function textSizeOf(doc) {
     const f = doc && doc.format || {};
     return TEXT_SIZES.includes(f.textSize) ? f.textSize : 24;

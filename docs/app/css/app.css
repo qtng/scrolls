@@ -91,7 +91,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .tools select:disabled { opacity: .3; }
 .h-icon sub { font-size: .6em; font-weight: 700; bottom: 0; margin-left: 1px; }
 /* reading: text, back, zoom slider and pencil only; editing: all the bars (the pencil and the slider are gone) */
-.reading .fmtbar, .reading #undo-btn, .reading #redo-btn, .reading #page-new, .reading #style-btn, .reading #menu-btn { display: none; }
+.reading .fmtbar, .reading #undo-btn, .reading #redo-btn, .reading #style-btn, .reading #menu-btn { display: none; }
 #view-editor:not(.reading) #edit-btn, #view-editor:not(.reading) .read-zoom { display: none; }
 .read-zoom { flex: 2 1 0; min-width: 0; max-width: 18rem; accent-color: var(--accent); }
 
@@ -188,15 +188,12 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .variant:not(:disabled):active, .more:not(:disabled):active, .nom-more button:active { background: rgba(255, 255, 255, .12); }
 .more[aria-expanded="true"] { color: var(--accent); border-color: var(--accent); }
 .variant.nom, .nom-more button { font-family: var(--doc-font), var(--nom), serif; }
+/* PA (slot 2): tinted, QATT (slot 1) plain; the first Chữ Nôm candidate (the one a space will take) is filled in the accent colour */
+.variant.pa { background: color-mix(in srgb, var(--accent) 26%, var(--bg)); border-color: transparent; }
+.variant.first { background: var(--accent); color: #fff; border-color: var(--accent); }
 .nom-more { position: absolute; z-index: 5; left: .5rem; right: .5rem; bottom: 100%; max-height: 40vh; max-height: 40dvh; overflow-y: auto; display: grid; grid-template-columns: repeat(auto-fill, minmax(48px, 1fr)); gap: .3rem; padding: .4rem;
   background: rgba(58, 51, 42, .9); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 -6px 18px rgba(0, 0, 0, .5); }
 .nom-more button { min-height: 48px; padding: 0 .2rem; border: 1px solid var(--line); border-radius: 10px; background: var(--bg); font-size: 1.6rem; line-height: 1; white-space: nowrap; }
-/* direct input: the 22 shapes in two rows of 11, in the order of the column (top, bottom, next column) */
-.directbar { display: none; flex: 1; min-width: 0; grid-template-rows: repeat(2, 44px); grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: .25rem; }
-.keybar.direct .directbar { display: grid; }
-.keybar.direct .variants, .keybar.direct .nom-more { display: none !important; }
-.directbar button { min-width: 0; padding: 0; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); font-family: var(--doc-font), system-ui, sans-serif; font-size: 1.5rem; line-height: 1; overflow: hidden; }
-.directbar button:active { background: rgba(255, 255, 255, .12); }
 
 /* the card of the font versions (menu of the list), as in Qatt.org Notes */
 .menu-version { padding: .4rem 1rem .5rem; font-size: .75rem; color: var(--muted); user-select: text; }
@@ -216,7 +213,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 
 /* the title bar of the editor: back, the direction, the size, then edit, style, menu */
 .appbar .grow { flex: 1; }
-.page-tools { flex: none; display: flex; }
+.page-tools { flex: none; display: flex; gap: .25rem; }
 .page-tools button { width: 44px; height: 44px; border: 1px solid var(--line); border-radius: 10px; background: transparent; font-size: 1.1rem; }
 .page-tools button:active { background: rgba(255, 255, 255, .1); }
 .page-tools button:disabled { opacity: .35; }
@@ -253,7 +250,7 @@ input.doc-title:focus { border-color: var(--accent); }
 .size-btn[aria-expanded="true"] { color: var(--accent); border-color: var(--accent); }
 .fmtbar .page-tools button { width: 40px; height: 40px; }
 .fmtbar .ime-select { max-width: 6.5rem; }
-.fmtbar .size-select { flex: none; width: auto; }
+.fmtbar .size-select { flex: none; width: 5.2em; max-width: none; }   /* the longest entry is "96px": always the same width */
 
 /* shared (somebody else's link): reading only; the owner shares and ends the link from the bar */
 #view-editor.shared #edit-btn, #view-editor.shared #share-btn { display: none; }
