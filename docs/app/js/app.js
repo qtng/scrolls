@@ -708,16 +708,25 @@ window.notesApp = { store, ready, flush() } is for the tests.
   });
 
   // ----- the account: signed in, the documents are synced with it (sync.js) -----
-  let syncing = false, syncTimer = 0, resumeQueued = false;
-  function syncSoon() { if (!DocsSync.user) return; clearTimeout(syncTimer); syncTimer = setTimeout(sync, 4000); }
+  let syncing = false, syncTimer = 0, resumeQueued = false, againQueued = false;
+  // a change goes to the account 4 s after the last save, and at the latest 30 s after the first change not yet sent (also while typing on)
+  let firstUnsent = 0;
+  function syncSoon() {
+    if (!DocsSync.user) return;
+    const now = Date.now();
+    if (!firstUnsent) firstUnsent = now;
+    clearTimeout(syncTimer);
+    syncTimer = setTimeout(sync, Math.max(0, Math.min(4000, firstUnsent + 30000 - now)));
+  }
   // resume: the open document is used again after a pause (see below): a newer version in the account replaces it, also what was typed since
   async function sync(byHand, resume) {
     if (!DocsSync.user) return;
-    if (syncing) { if (resume) resumeQueued = true; return; }
+    if (syncing) { if (resume) resumeQueued = true; else againQueued = true; return; }   // once more when this one ends
     syncing = true;
     if (byHand) snack('Syncing…', 'Đang đồng bộ…', { sticky: true });
     try {
       await save();
+      firstUnsent = 0; clearTimeout(syncTimer);
       const started = Date.now(), open = state.current && !state.shared ? state.current : null, openAt = open && open.updated;
       const r = await DocsSync.run(state.docs, state.store, { skip: open && open.id, prefer: resume && open ? open.id : null });
       const cur = new Map(state.docs.map(d => [d.id, d]));   // what was typed or made while the sync ran stays (the sync worked on the documents as they were at its start)
@@ -740,7 +749,8 @@ window.notesApp = { store, ready, flush() } is for the tests.
       if (byHand) snack('Could not sync (offline?)', 'Không đồng bộ được (đang ngoại tuyến?)');
     } finally {
       syncing = false;
-      if (resumeQueued) { resumeQueued = false; sync(false, true); }
+      if (resumeQueued) { resumeQueued = againQueued = false; sync(false, true); }
+      else if (againQueued) { againQueued = false; sync(); }
     }
   }
   // the first key, tap or click in the document after a pause of 30 s asks the account for a newer version at once (another device may have changed it)
@@ -752,11 +762,7 @@ window.notesApp = { store, ready, flush() } is for the tests.
     lastActive = now;
   };
   for (const type of ['keydown', 'pointerdown', 'beforeinput']) $('editor').addEventListener(type, activity, true);
-  // the regular sync every 30 s (an open document follows the changes of another device) stops after 2 minutes without a key or tap anywhere in the app
-  const IDLE = 120000;
-  let lastUsed = Date.now();
-  for (const type of ['keydown', 'pointerdown']) document.addEventListener(type, () => { lastUsed = Date.now(); }, true);
-  setInterval(() => { if (document.visibilityState === 'visible' && Date.now() - lastUsed < IDLE) sync(); }, 30000);
+
   function renderAccount() {
     const u = DocsSync.user, label = $('account-label');
     if (u) { label.setAttribute('data-vi', 'Đăng xuất (' + (u.email || '') + ')'); label.textContent = 'Sign out (' + (u.email || '') + ')'; }
