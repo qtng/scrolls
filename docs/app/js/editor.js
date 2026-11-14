@@ -717,7 +717,7 @@ function cellBefore(state, pos) {
 // ---------------------------------------------------------------- the toolbar (the format bar of the app)
 const UI = {
     view: null,
-    // parts: format (the format bar: headings, two-column text, ruby), dir (the direction, in the format bar), menu (characters per column), newPage (the title bar)
+    // parts: format (the format bar: headings, two-column text, ruby), dir (the direction, in the format bar), menu (characters per column), newPage (the format bar, next to the direction)
     init(parts) {
         this.bar = parts.format;
         const btn = (content, en, viText, run) => {

@@ -91,7 +91,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .tools select:disabled { opacity: .3; }
 .h-icon sub { font-size: .6em; font-weight: 700; bottom: 0; margin-left: 1px; }
 /* reading: text, back, zoom slider and pencil only; editing: all the bars (the pencil and the slider are gone) */
-.reading .fmtbar, .reading #undo-btn, .reading #redo-btn, .reading #page-new, .reading #style-btn, .reading #menu-btn { display: none; }
+.reading .fmtbar, .reading #undo-btn, .reading #redo-btn, .reading #style-btn, .reading #menu-btn { display: none; }
 #view-editor:not(.reading) #edit-btn, #view-editor:not(.reading) .read-zoom { display: none; }
 .read-zoom { flex: 2 1 0; min-width: 0; max-width: 18rem; accent-color: var(--accent); }
 
