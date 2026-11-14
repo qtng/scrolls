@@ -152,8 +152,8 @@ button { font: inherit; color: inherit; cursor: pointer; }
 /* a circle, dot or sesame dot beside every character (a passage stressed): on the right (horizontal: over), on the other side when a reading is there */
 .ProseMirror .rb[data-deco="circle"] > .rb-b { text-emphasis-style: open circle; }
 .ProseMirror .rb[data-deco="dot"] > .rb-b { text-emphasis-style: filled circle; }
-.ProseMirror .rb[data-deco="sesame"] > .rb-b { text-emphasis-style: filled sesame; }
-.ProseMirror .rb[data-deco="sesame-open"] > .rb-b { text-emphasis-style: open sesame; }
+.ProseMirror .rb[data-deco="sesame"] > .rb-b { text-emphasis-style: '\FE45'; }
+.ProseMirror .rb[data-deco="sesame-open"] > .rb-b { text-emphasis-style: '\FE46'; }
 .ProseMirror .rb[data-deco]:not([data-deco^="rd"]) > .rb-b { text-emphasis-color: var(--mark-ink); text-emphasis-position: over right; }
 /* the reading marks 𡿨 亇 个 亅 ン ソ (deco rd1..rd6): a widget before every character (readMarks, editor.js), thin, in the colour of the text, in the upper right corner of its cell */
 .ProseMirror .rd-mark { display: inline-block; inline-size: 0; block-size: 0; position: relative; overflow: visible; user-select: none; pointer-events: none; }
