@@ -265,7 +265,7 @@ window.notesApp = { store, ready, flush() } is for the tests.
   $('share-end').addEventListener('click', async () => {
     closeMenu();
     const doc = state.current; if (!doc) return;
-    try { await DocsSync.shareEnd(doc.id); shareState = null; snack('The link has been stopped', 'Đã dừng chia sẻ liên kết'); }
+    try { await DocsSync.shareEnd(doc.id); shareState = null; snack('The link has been stopped', 'Đã hủy chia sẻ liên kết'); }
     catch (e) { console.error('Stop failed:', e); snack('Could not stop the link (offline?)', 'Không dừng được liên kết (đang ngoại tuyến?)'); }
   });
   window.addEventListener('popstate', async () => {
