@@ -345,8 +345,9 @@ window.notesApp = { store, ready, flush() } is for the tests.
   }
   // ----- special characters: the bar of ideographic brackets and CJK punctuation; the button next to the annotation button opens and closes it, and
   // it closes by itself as soon as the text or the caret changes (also after a character was put in) -----
-  const symbolbar = $('symbolbar'), SYMBOLS = [
-    ...'「」『』【】〔〕〈〉《》（）［］｛｝〖〗〘〙', ...'、。，．；：？！…‥・〜ー〃々〇※〆〒◎'];
+  // only what also looks right in vertical text with the QATT fonts (they have no vertical forms: brackets, 、。，． and ・ー〜 would stand wrong there);
+  // in pairs, one above the other
+  const symbolbar = $('symbolbar'), SYMBOLS = [...'？！；：…‥々〃〇◎〆※'];
   let symOpen = null;   // { doc, pos } of the editor when the bar was opened
   function showSymbols(on) {
     const was = !!symOpen;
