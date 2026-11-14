@@ -137,6 +137,7 @@ window.notesApp = { store, ready, flush() } is for the tests.
   // Editing is an entry of its own in the history (state.edit), so the back button of the phone does the same.
   function setEditing(on, push) {
     if (on && push && !(history.state && history.state.edit)) history.pushState({ fromList: true, edit: true }, '', location.hash);
+    if (on && zoom !== 100) setZoom(100, true);   // the zoom is for reading: editing is at 100 % (its slider is not there)
     NomEditor.setEditable(on);
     $('view-editor').classList.toggle('reading', !on);
     buttons();
