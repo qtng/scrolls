@@ -61,7 +61,9 @@ const schema = new Schema({
             attrs: { rt: { default: '' }, qn: { default: '' }, side: { default: 'over' } },
             inclusive: false,
             excludes: 'ruby warichu',
-            parseDOM: [{ tag: 'span.rb', contentElement: '.rb-b', getAttrs: d => ({ rt: d.getAttribute('data-rt') || '', qn: d.getAttribute('data-qn') || '', side: d.getAttribute('data-side') === 'under' ? 'under' : 'over' }) }],
+            // the reading (span.rt) is never text of the document: when a backspace removes the whole base, the browser may drop the span of the
+            // base too, and the reading would else be read back as the base
+            parseDOM: [{ tag: 'span.rt', ignore: true }, { tag: 'span.rb', contentElement: d => d.querySelector('.rb-b') || d, getAttrs: d => ({ rt: d.getAttribute('data-rt') || '', qn: d.getAttribute('data-qn') || '', side: d.getAttribute('data-side') === 'under' ? 'under' : 'over' }) }],
             toDOM: m => ['span', { class: 'rb', 'data-rt': m.attrs.rt, 'data-qn': m.attrs.qn, 'data-side': m.attrs.side }, ['span', { class: 'rb-b' }, 0], ['span', { class: 'rt', contenteditable: 'false' }, m.attrs.rt]],
         },
     },
@@ -642,6 +644,45 @@ function rubyAt(state, pos) {
     return found;
 }
 
+// Backspace and Delete next to a ruby: done here, not by the browser. The browser deletes beside the reading (contenteditable=false) itself and
+// leaves a wrong DOM behind (the base shown with the reading, the reading on the space before), which ProseMirror does not draw again.
+function deleteNextToRuby(view, back) {
+    const { state } = view, sel = state.selection;
+    if (!sel.empty || view.composing) return false;
+    const $pos = sel.$from, type = schema.marks.ruby, start = $pos.start();
+    if (!$pos.parent.inlineContent) return false;
+    const near = back ? $pos.nodeBefore : $pos.nodeAfter, other = back ? $pos.nodeAfter : $pos.nodeBefore;
+    if (!(near && type.isInSet(near.marks)) && !(other && type.isInSet(other.marks))) return false;
+    if (!near || !near.isText) return false;   // a page edge, a node: as usual
+    const pos = sel.from;
+    let from, to;
+    if (back) {
+        const cells = cellsOf(state.doc.textBetween(Math.max(start, pos - 16), pos));
+        const last = cells[cells.length - 1] || ''; from = pos - Math.max(1, last.length); to = pos;
+    } else {
+        const first = cellsOf(state.doc.textBetween(pos, Math.min($pos.end(), pos + 16)))[0] || ''; from = pos; to = pos + Math.max(1, first.length);
+    }
+    view.dispatch(state.tr.delete(from, to).scrollIntoView());
+    return true;
+}
+const rubyDelete = new Plugin({
+    props: {
+        handleKeyDown(view, e) {
+            if (e.isComposing || e.ctrlKey || e.metaKey || e.altKey || (e.key !== 'Backspace' && e.key !== 'Delete')) return false;
+            return deleteNextToRuby(view, e.key === 'Backspace');
+        },
+        handleDOMEvents: {
+            // keyboards of phones send no Backspace key, only the input event
+            beforeinput(view, e) {
+                if (e.inputType !== 'deleteContentBackward' && e.inputType !== 'deleteContentForward') return false;
+                if (!deleteNextToRuby(view, e.inputType === 'deleteContentBackward')) return false;
+                e.preventDefault();
+                return true;
+            },
+        },
+    },
+});
+
 // the visible cell (a character, a QATT or PA cell) just before the caret, not in two-column text: the base of a new ruby
 function cellBefore(state, pos) {
     const $pos = state.doc.resolve(pos), start = $pos.start();
@@ -945,6 +986,7 @@ const NomEditor = {
     mount(element, parts, extra = []) {
         UI.init(parts);
         const plugins = [
+            rubyDelete,   // a deletion next to a ruby, before the input (a cell of QATT or PA in a ruby too)
             ...extra,   // the input (input.js) first: its keys before the keymaps
             imeKeys,
             keymap({
